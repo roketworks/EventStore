@@ -196,11 +196,6 @@ namespace EventStore.Core.Services.Storage {
 
 		public void Handle(SystemMessage.StateChangeMessage msg) {
 			if (_state == VNodeState.Master && msg.State != VNodeState.Master) {
-				var commits = _commitAcks.GetAllCommitAcks();
-				foreach (var commit in commits) {
-					CommitReplicated(commit.CommitAcks[0]);
-				}
-
 				_commitAcks.ClearCommitAcks();
 			}
 
@@ -212,21 +207,21 @@ namespace EventStore.Core.Services.Storage {
 		}
 
 		public void Handle(StorageMessage.CommitAck message) {
-			if (_state != VNodeState.Master || _commitCount == 1) {
+			if (_state == VNodeState.Slave || _commitCount == 1) {
 #if DEBUG
 				_queueStats.Enqueued();
 #endif
 				_replicatedQueue.Enqueue(message);
 				_addMsgSignal.Set();
 				return;
-			}
+			} else if(_state == VNodeState.Master){
+				var checkpoint = _replicationCheckpoint.ReadNonFlushed();
+				if (message.LogPosition <= checkpoint) return;
 
-			var checkpoint = _replicationCheckpoint.ReadNonFlushed();
-			if (message.LogPosition <= checkpoint) return;
-
-			var res = _commitAcks.AddCommitAck(message);
-			if (res.IsReplicated(_commitCount)) {
-				EnqueueCommitsUpToPosition(message);
+				var res = _commitAcks.AddCommitAck(message);
+				if (res.IsReplicated(_commitCount)) {
+					EnqueueCommitsUpToPosition(message);
+				}
 			}
 		}
 
