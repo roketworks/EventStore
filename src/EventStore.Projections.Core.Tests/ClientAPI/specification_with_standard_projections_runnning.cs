@@ -17,10 +17,11 @@ using EventStore.Projections.Core.Services.Processing;
 using NUnit.Framework;
 using ResolvedEvent = EventStore.ClientAPI.ResolvedEvent;
 using EventStore.ClientAPI.Projections;
+using EventStore.Common;
 
 namespace EventStore.Projections.Core.Tests.ClientAPI {
 	[Category("ClientAPI")]
-	public class specification_with_standard_projections_runnning : SpecificationWithDirectoryPerTestFixture {
+	public abstract class specification_with_standard_projections_runnning<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
 		protected IEventStoreConnection _conn;
 		protected UserCredentials _admin = DefaultData.AdminCredentials;
 		protected ProjectionsManager _manager;
@@ -28,7 +29,7 @@ namespace EventStore.Projections.Core.Tests.ClientAPI {
 #if DEBUG
 		private Task _projectionsCreated;
 		private ProjectionsSubsystem _projections;
-		private MiniNode _node;
+		private MiniNode<TLogFormat, TStreamId> _node;
 #endif
 		[OneTimeSetUp]
 		public override async Task TestFixtureSetUp() {
@@ -37,11 +38,17 @@ namespace EventStore.Projections.Core.Tests.ClientAPI {
             Assert.Ignore("These tests require DEBUG conditional");
 #else
 			var projectionWorkerThreadCount = GivenWorkerThreadCount();
-			_projections = new ProjectionsSubsystem(projectionWorkerThreadCount, runProjections: ProjectionType.All,
-				startStandardProjections: false,
-				projectionQueryExpiry: TimeSpan.FromMinutes(Opts.ProjectionsQueryExpiryDefault),
-				faultOutOfOrderProjections: Opts.FaultOutOfOrderProjectionsDefault);
-			_node = new MiniNode(
+			var configuration = new ProjectionSubsystemOptions(
+				projectionWorkerThreadCount,
+				ProjectionType.All,
+				false,
+				TimeSpan.FromMinutes(Opts.ProjectionsQueryExpiryDefault),
+				Opts.FaultOutOfOrderProjectionsDefault,
+				JavascriptProjectionRuntime.Interpreted,
+				500,
+				250);
+			_projections = new ProjectionsSubsystem(configuration);
+			_node = new MiniNode<TLogFormat, TStreamId>(
 				PathName, inMemDb: true,
 				subsystems: new ISubsystem[] {_projections});
 			_projectionsCreated = SystemProjections.Created(_projections.LeaderMainBus);

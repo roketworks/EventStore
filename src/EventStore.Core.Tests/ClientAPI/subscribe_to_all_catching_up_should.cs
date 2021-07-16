@@ -12,18 +12,20 @@ using NUnit.Framework;
 using ILogger = Serilog.ILogger;
 
 namespace EventStore.Core.Tests.ClientAPI {
-	[TestFixture, Category("ClientAPI"), Category("LongRunning")]
-	public class subscribe_to_all_catching_up_should : SpecificationWithDirectory {
-		private static readonly ILogger Log = Serilog.Log.ForContext<subscribe_to_all_catching_up_should>();
+	[Category("ClientAPI"), Category("LongRunning")]
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class subscribe_to_all_catching_up_should<TLogFormat, TStreamId> : SpecificationWithDirectory {
+		private static readonly ILogger Log = Serilog.Log.ForContext<subscribe_to_all_catching_up_should<TLogFormat, TStreamId>>();
 		private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
-		private MiniNode _node;
+		private MiniNode<TLogFormat, TStreamId> _node;
 		private IEventStoreConnection _conn;
 
 		[SetUp]
 		public override async Task SetUp() {
 			await base.SetUp();
-			_node = new MiniNode(PathName);
+			_node = new MiniNode<TLogFormat, TStreamId>(PathName);
 			await _node.Start();
 
 			_conn = BuildConnection(_node);
@@ -40,7 +42,7 @@ namespace EventStore.Core.Tests.ClientAPI {
 			await base.TearDown();
 		}
 
-		protected virtual IEventStoreConnection BuildConnection(MiniNode node) {
+		protected virtual IEventStoreConnection BuildConnection(MiniNode<TLogFormat, TStreamId> node) {
 			return TestConnection.Create(node.TcpEndPoint);
 		}
 
@@ -174,6 +176,9 @@ namespace EventStore.Core.Tests.ClientAPI {
 				var subscription = store.SubscribeToAllFrom(lastEvent.OriginalPosition,
 					CatchUpSubscriptionSettings.Default,
 					(x, y) => {
+						if (y.Event.EventStreamId == SystemStreams.StreamsCreatedStream) {
+							return Task.CompletedTask;
+						}
 						events.Add(y);
 						appeared.Signal();
 						return Task.CompletedTask;

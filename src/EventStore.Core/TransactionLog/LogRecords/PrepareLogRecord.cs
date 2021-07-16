@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using EventStore.Common.Utils;
 using EventStore.Core.TransactionLog.Chunks;
-using EventStore.Core.Helpers;
+using EventStore.LogCommon;
 
 namespace EventStore.Core.TransactionLog.LogRecords {
 	[Flags]
@@ -138,6 +138,22 @@ namespace EventStore.Core.TransactionLog.LogRecords {
 			var metadataCount = reader.ReadInt32();
 			Metadata = metadataCount == 0 ? NoData : reader.ReadBytes(metadataCount);
 			if (InMemorySize > TFConsts.MaxLogRecordSize) throw new Exception("Record too large.");
+		}
+
+		public IPrepareLogRecord<string> CopyForRetry(long logPosition, long transactionPosition) {
+			return new PrepareLogRecord(
+				logPosition: logPosition,
+				correlationId: CorrelationId,
+				eventId: EventId,
+				transactionPosition: transactionPosition,
+				transactionOffset: TransactionOffset,
+				eventStreamId: EventStreamId,
+				expectedVersion: ExpectedVersion,
+				timeStamp: TimeStamp,
+				flags: Flags,
+				eventType: EventType,
+				data: Data,
+				metadata: Metadata);
 		}
 
 		public override void WriteTo(BinaryWriter writer) {

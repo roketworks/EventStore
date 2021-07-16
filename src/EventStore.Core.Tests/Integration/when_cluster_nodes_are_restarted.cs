@@ -6,7 +6,9 @@ using EventStore.Core.Data;
 using Microsoft.Diagnostics.Tracing.Parsers.Tpl;
 
 namespace EventStore.Core.Tests.Integration {
-	public class when_restarting_one_node_at_a_time : specification_with_cluster {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_restarting_one_node_at_a_time<TLogFormat, TStreamId> : specification_with_cluster<TLogFormat, TStreamId> {
 		protected override async Task Given() {
 			await base.Given();
 
@@ -27,11 +29,16 @@ namespace EventStore.Core.Tests.Integration {
 		public void cluster_should_stabilize() {
 			var leaders = 0;
 			var followers = 0;
+			var acceptedStates = new[] {VNodeState.Leader, VNodeState.Follower};
 
 			for (int i = 0; i < 3; i++) {
+				AssertEx.IsOrBecomesTrue(() => acceptedStates.Contains(_nodes[i].NodeState),
+					TimeSpan.FromSeconds(5), $"node {i} failed to become a leader/follower");
+
 				var state = _nodes[i].NodeState;
 				if (state == VNodeState.Leader) leaders++;
 				else if (state == VNodeState.Follower) followers++;
+				else throw new Exception($"node {i} in unexpected state {state}");
 			}
 
 			Assert.AreEqual(1, leaders);

@@ -13,11 +13,13 @@ using EventStore.Core.Tests.Helpers;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.ClientAPI {
-	[TestFixture, Category("ClientAPI"), Category("LongRunning"), NonParallelizable]
-	public class subscribe_to_all_filtered_should : SpecificationWithDirectory {
+	[Category("ClientAPI"), Category("LongRunning"), NonParallelizable]
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class subscribe_to_all_filtered_should<TLogFormat, TStreamId> : SpecificationWithDirectory {
 		private const int Timeout = 10000;
 
-		private MiniNode _node;
+		private MiniNode<TLogFormat, TStreamId> _node;
 		private IEventStoreConnection _conn;
 		private List<EventData> _testEvents;
 		private List<EventData> _fakeSystemEvents;
@@ -25,7 +27,7 @@ namespace EventStore.Core.Tests.ClientAPI {
 		[SetUp]
 		public override async Task SetUp() {
 			await base.SetUp();
-			_node = new MiniNode(PathName);
+			_node = new MiniNode<TLogFormat, TStreamId>(PathName);
 			await _node.Start();
 
 			_conn = BuildConnection(_node);
@@ -199,18 +201,19 @@ namespace EventStore.Core.Tests.ClientAPI {
 
 		[Test, Category("LongRunning")]
 		public async Task calls_checkpoint_reached_according_to_checkpoint_message_count() {
+			var isV3 = LogFormatHelper<TLogFormat, TStreamId>.IsV3;
 			var filter = Filter.ExcludeSystemEvents;
 
 			using (var store = BuildConnection(_node)) {
 				await store.ConnectAsync();
 				var appeared = new TaskCompletionSource<bool>();
-				var eventsSeen = 0;
+				var eventsSeen = new List<ResolvedEvent>();
 				var checkpointsSeen = 0;
 
 				using (await store.FilteredSubscribeToAllAsync(false,
 					filter,
 					(s, e) => {
-						eventsSeen++;
+						eventsSeen.Add(e);
 						return Task.CompletedTask;
 					},
 					(s, p) => {
@@ -224,7 +227,8 @@ namespace EventStore.Core.Tests.ClientAPI {
 
 					await appeared.Task.WithTimeout(Timeout);
 
-					Assert.AreEqual(10, eventsSeen);
+					Assert.AreEqual(5 /*checkpoints*/ * 2 /*considered events*/ - (isV3 ? 1 : 0) /*filtered out "stream-a" stream record event*/, eventsSeen.Count);
+					Assert.True(eventsSeen.All(x => x.Event.EventStreamId == "stream-a"));
 				}
 			}
 		}
@@ -236,7 +240,7 @@ namespace EventStore.Core.Tests.ClientAPI {
 			await base.TearDown();
 		}
 
-		protected virtual IEventStoreConnection BuildConnection(MiniNode node) {
+		protected virtual IEventStoreConnection BuildConnection(MiniNode<TLogFormat, TStreamId> node) {
 			return TestConnection.Create(node.TcpEndPoint);
 		}
 	}

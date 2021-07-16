@@ -6,16 +6,18 @@ using EventStore.Core.Tests.Helpers;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.ClientAPI {
-	[TestFixture, Category("ClientAPI"), Category("LongRunning")]
-	public class subscribe_should : SpecificationWithDirectoryPerTestFixture {
+	[Category("ClientAPI"), Category("LongRunning")]
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class subscribe_should<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
 		private const int Timeout = 10000;
 
-		private MiniNode _node;
+		private MiniNode<TLogFormat, TStreamId> _node;
 
 		[OneTimeSetUp]
 		public override async Task TestFixtureSetUp() {
 			await base.TestFixtureSetUp();
-			_node = new MiniNode(PathName);
+			_node = new MiniNode<TLogFormat, TStreamId>(PathName);
 			await _node.Start();
 		}
 
@@ -25,7 +27,7 @@ namespace EventStore.Core.Tests.ClientAPI {
 			await base.TestFixtureTearDown();
 		}
 
-		protected virtual IEventStoreConnection BuildConnection(MiniNode node) {
+		protected virtual IEventStoreConnection BuildConnection(MiniNode<TLogFormat, TStreamId> node) {
 			return TestConnection.Create(node.TcpEndPoint);
 		}
 

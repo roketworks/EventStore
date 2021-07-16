@@ -6,10 +6,14 @@ using EventStore.Core.Tests.Helpers;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.ClientAPI {
-	[TestFixture(TcpType.Normal), TestFixture(TcpType.Ssl), Category("ClientAPI"), Category("LongRunning")]
-	public class event_store_connection_should : SpecificationWithDirectoryPerTestFixture {
+	[Category("ClientAPI"), Category("LongRunning")]
+	[TestFixture(typeof(LogFormat.V2), typeof(string), TcpType.Normal)]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint), TcpType.Normal)]
+	[TestFixture(typeof(LogFormat.V2), typeof(string), TcpType.Ssl)]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint), TcpType.Ssl)]
+	public class event_store_connection_should<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
 		private readonly TcpType _tcpType;
-		private MiniNode _node;
+		private MiniNode<TLogFormat, TStreamId> _node;
 
 		public event_store_connection_should(TcpType tcpType) {
 			_tcpType = tcpType;
@@ -18,7 +22,7 @@ namespace EventStore.Core.Tests.ClientAPI {
 		[OneTimeSetUp]
 		public override async Task TestFixtureSetUp() {
 			await base.TestFixtureSetUp();
-			_node = new MiniNode(PathName);
+			_node = new MiniNode<TLogFormat, TStreamId>(PathName);
 			await _node.Start();
 		}
 

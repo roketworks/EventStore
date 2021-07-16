@@ -9,6 +9,7 @@ using EventStore.ClientAPI;
 using EventStore.ClientAPI.Projections;
 using EventStore.ClientAPI.Common.Log;
 using EventStore.ClientAPI.SystemData;
+using EventStore.Common;
 using EventStore.Common.Options;
 using EventStore.Core;
 using EventStore.Core.Tests;
@@ -19,8 +20,8 @@ using EventStore.Core.Util;
 using EventStore.Projections.Core.Services.Processing;
 
 namespace EventStore.Projections.Core.Tests.ClientAPI.projectionsManager {
-	public abstract class SpecificationWithNodeAndProjectionsManager : SpecificationWithDirectoryPerTestFixture {
-		protected MiniNode _node;
+	public abstract class SpecificationWithNodeAndProjectionsManager<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
+		protected MiniNode<TLogFormat, TStreamId> _node;
 		protected ProjectionsManager _projManager;
 		protected IEventStoreConnection _connection;
 		protected UserCredentials _credentials;
@@ -71,13 +72,10 @@ namespace EventStore.Projections.Core.Tests.ClientAPI.projectionsManager {
 		public abstract Task Given();
 		public abstract Task When();
 
-		protected MiniNode CreateNode() {
-			_projectionsSubsystem = new ProjectionsSubsystem(1, runProjections: ProjectionType.All,
-				startStandardProjections: false,
-				projectionQueryExpiry: TimeSpan.FromMinutes(Opts.ProjectionsQueryExpiryDefault),
-				faultOutOfOrderProjections: Opts.FaultOutOfOrderProjectionsDefault);
+		protected MiniNode<TLogFormat, TStreamId> CreateNode() {
+			_projectionsSubsystem = new ProjectionsSubsystem(new ProjectionSubsystemOptions(1, ProjectionType.All, false, TimeSpan.FromMinutes(Opts.ProjectionsQueryExpiryDefault), Opts.FaultOutOfOrderProjectionsDefault, JavascriptProjectionRuntime.Interpreted, 500, 250));
 			_systemProjectionsCreated = SystemProjections.Created(_projectionsSubsystem.LeaderMainBus);
-			return new MiniNode(
+			return new MiniNode<TLogFormat, TStreamId>(
 				PathName, inMemDb: true,
 				subsystems: new ISubsystem[] {_projectionsSubsystem});
 		}

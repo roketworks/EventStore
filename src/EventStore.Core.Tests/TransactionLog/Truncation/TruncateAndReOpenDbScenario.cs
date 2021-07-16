@@ -11,15 +11,10 @@ using EventStore.Core.TransactionLog.Chunks;
 using EventStore.Core.TransactionLog.FileNamingStrategy;
 using EventStore.Core.Util;
 using EventStore.Core.Index.Hashes;
+using EventStore.Core.Tests.Services;
 
 namespace EventStore.Core.Tests.TransactionLog.Truncation {
-	public abstract class TruncateAndReOpenDbScenario : TruncateAndReOpenDbScenario<string> {
-		protected TruncateAndReOpenDbScenario(int maxEntriesInMemTable = 100, int metastreamMaxCount = 1)
-			: base(maxEntriesInMemTable, metastreamMaxCount) {
-		}
-	}
-
-	public abstract class TruncateAndReOpenDbScenario<TStreamId> : TruncateScenario<TStreamId> {
+	public abstract class TruncateAndReOpenDbScenario<TLogFormat, TStreamId> : TruncateScenario<TLogFormat, TStreamId> {
 		protected TruncateAndReOpenDbScenario(int maxEntriesInMemTable = 100, int metastreamMaxCount = 1)
 			: base(maxEntriesInMemTable, metastreamMaxCount) {
 		}
@@ -35,25 +30,30 @@ namespace EventStore.Core.Tests.TransactionLog.Truncation {
 
 			Db.Open();
 
+			var indexDirectory = GetFilePathFor("index");
+			_logFormat = LogFormatHelper<TLogFormat, TStreamId>.LogFormatFactory.Create(new() {
+				IndexDirectory = indexDirectory,
+			});
 			var readers = new ObjectPool<ITransactionFileReader>("Readers", 2, 5,
 				() => new TFChunkReader(Db, Db.Config.WriterCheckpoint));
 			var lowHasher = _logFormat.LowHasher;
 			var highHasher = _logFormat.HighHasher;
 			var emptyStreamId = _logFormat.EmptyStreamId;
-			TableIndex = new TableIndex<TStreamId>(Path.Combine(PathName, "index"), lowHasher, highHasher, emptyStreamId,
+			TableIndex = new TableIndex<TStreamId>(indexDirectory, lowHasher, highHasher, emptyStreamId,
 				() => new HashListMemTable(PTableVersions.IndexV3, MaxEntriesInMemTable * 2),
 				() => new TFReaderLease(readers),
 				PTableVersions.IndexV3,
 				int.MaxValue,
 				Constants.PTableMaxReaderCountDefault,
 				MaxEntriesInMemTable);
-			ReadIndex = new ReadIndex<TStreamId>(new NoopPublisher(),
+			var readIndex = new ReadIndex<TStreamId>(new NoopPublisher(),
 				readers,
 				TableIndex,
+				_logFormat.StreamNameIndexConfirmer,
 				_logFormat.StreamIds,
-				_logFormat.StreamNamesFactory,
-				_logFormat.SystemStreams,
+				_logFormat.StreamNamesProvider,
 				_logFormat.EmptyStreamId,
+				_logFormat.StreamIdConverter,
 				_logFormat.StreamIdValidator,
 				_logFormat.StreamIdSizer,
 				0,
@@ -63,7 +63,8 @@ namespace EventStore.Core.Tests.TransactionLog.Truncation {
 				skipIndexScanOnReads: Opts.SkipIndexScanOnReadsDefault,
 				replicationCheckpoint: Db.Config.ReplicationCheckpoint,
 				indexCheckpoint: Db.Config.IndexCheckpoint);
-			((ReadIndex<TStreamId>)ReadIndex).IndexCommitter.Init(ChaserCheckpoint.Read());
+			readIndex.IndexCommitter.Init(ChaserCheckpoint.Read());
+			ReadIndex = readIndex;
 		}
 	}
 }

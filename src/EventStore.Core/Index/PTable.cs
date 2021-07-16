@@ -15,11 +15,6 @@ using ILogger = Serilog.ILogger;
 using Range = EventStore.Core.Data.Range;
 
 namespace EventStore.Core.Index {
-	public enum FileType : byte {
-		PTableFile = 1,
-		ChunkFile = 2
-	}
-
 	public class PTableVersions {
 		public const byte IndexV1 = 1;
 		public const byte IndexV2 = 2;
@@ -77,7 +72,7 @@ namespace EventStore.Core.Index {
 		private volatile bool _deleteFile;
 		private bool _disposed;
 
-		internal ReadOnlySpan<Midpoint> GetMidPoints() {
+		public ReadOnlySpan<Midpoint> GetMidPoints() {
 			if(_midpoints == null)
 				return ReadOnlySpan<Midpoint>.Empty;
 
@@ -772,7 +767,7 @@ namespace EventStore.Core.Index {
 				throw new TimeoutException();
 		}
 
-		internal struct Midpoint {
+		public struct Midpoint {
 			public readonly IndexEntryKey Key;
 			public readonly long ItemIndex;
 
@@ -782,9 +777,9 @@ namespace EventStore.Core.Index {
 			}
 		}
 
-		internal struct IndexEntryKey {
-			public ulong Stream;
-			public long Version;
+		public readonly struct IndexEntryKey {
+			public readonly ulong Stream;
+			public readonly long Version;
 
 			public IndexEntryKey(ulong stream, long version) {
 				Stream = stream;

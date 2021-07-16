@@ -16,16 +16,19 @@ jobs:
   vulnerability-scan:
     runs-on: ubuntu-latest
     name: ci/github/scan-vulnerabilities
-    container: mcr.microsoft.com/dotnet/core/sdk:3.1-bionic
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+    - name: Install net5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.x
     - name: Scan for Vulnerabilities
       run: |
-        dotnet tool restore
         cd src
         dotnet restore
-        dotnet tool run dotnet-retire
+        dotnet list package --vulnerable --include-transitive | tee vulnerabilities.txt
+        ! cat vulnerabilities.txt | grep -q "has the following vulnerable packages"
   protolock:
     runs-on: ubuntu-latest
     name: ci/github/protolock
@@ -173,7 +176,9 @@ jobs:
     - name: Run Tests
       shell: bash
       run: |
-        find ./src -maxdepth 1 -type d -name "*.Tests"  -print0 | xargs -I{} -0 -n1 bash -c 'dotnet test --configuration ${{ matrix.configuration }} --blame --settings ./ci/ci.runsettings --logger:html --logger:trx --logger:"console;verbosity=normal" --results-directory=$(pwd)/test-results/$1 $1' - '{}'
+        find ./src -maxdepth 1 -type d -name "*.Tests"  -print0 \
+          | xargs -I{} -0 -n1 bash -c \
+          'dotnet test --configuration ${{ matrix.configuration }} --blame --settings ./ci/ci.runsettings --logger:"GitHubActions;report-warnings=false" --logger:html --logger:trx --logger:"console;verbosity=normal" --results-directory=$(pwd)/test-results/$1 $1' - '{}'
     - name: Collect Test Results
       shell: bash
       if: always()

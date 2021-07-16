@@ -14,8 +14,9 @@ using EventStore.Core.Util;
 using EventStore.Core.Index.Hashes;
 
 namespace EventStore.Core.Tests.Services.Storage.Transactions {
-	[TestFixture]
-	public class when_rebuilding_index_for_partially_persisted_transaction : ReadIndexTestScenario {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint), Ignore = "Explicit transactions are not supported yet by Log V3")]
+	public class when_rebuilding_index_for_partially_persisted_transaction<TLogFormat, TStreamId> : ReadIndexTestScenario<TLogFormat, TStreamId> {
 		public when_rebuilding_index_for_partially_persisted_transaction() : base(maxEntriesInMemTable: 10) {
 		}
 
@@ -31,19 +32,20 @@ namespace EventStore.Core.Tests.Services.Storage.Transactions {
 			var lowHasher = _logFormat.LowHasher;
 			var highHasher = _logFormat.HighHasher;
 			var emptyStreamId = _logFormat.EmptyStreamId;
-			TableIndex = new TableIndex<string>(GetFilePathFor("index"), lowHasher, highHasher, emptyStreamId,
+			TableIndex = new TableIndex<TStreamId>(GetFilePathFor("index"), lowHasher, highHasher, emptyStreamId,
 				() => new HashListMemTable(PTableVersions.IndexV2, maxSize: MaxEntriesInMemTable * 2),
 				() => new TFReaderLease(readers),
 				PTableVersions.IndexV2,
 				5, Constants.PTableMaxReaderCountDefault,
 				maxSizeForMemory: MaxEntriesInMemTable);
-			ReadIndex = new ReadIndex<string>(new NoopPublisher(),
+			var readIndex = new ReadIndex<TStreamId>(new NoopPublisher(),
 				readers,
 				TableIndex,
+				_logFormat.StreamNameIndexConfirmer,
 				_logFormat.StreamIds,
-				_logFormat.StreamNamesFactory,
-				_logFormat.SystemStreams,
+				_logFormat.StreamNamesProvider,
 				_logFormat.EmptyStreamId,
+				_logFormat.StreamIdConverter,
 				_logFormat.StreamIdValidator,
 				_logFormat.StreamIdSizer,
 				0,
@@ -53,7 +55,8 @@ namespace EventStore.Core.Tests.Services.Storage.Transactions {
 				skipIndexScanOnReads: Opts.SkipIndexScanOnReadsDefault,
 				replicationCheckpoint: Db.Config.ReplicationCheckpoint,
 				indexCheckpoint: Db.Config.IndexCheckpoint);
-			((ReadIndex<string>)ReadIndex).IndexCommitter.Init(ChaserCheckpoint.Read());
+			readIndex.IndexCommitter.Init(ChaserCheckpoint.Read());
+			ReadIndex = readIndex;
 		}
 
 		protected override void WriteTestScenario() {

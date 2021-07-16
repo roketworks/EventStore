@@ -13,10 +13,11 @@ using System.Threading.Tasks;
 using EventStore.Core.Services;
 
 namespace EventStore.Core.Tests.ClientAPI {
-	[TestFixture]
 	[Category("LongRunning"), Category("ClientAPI")]
-	public class catchup_filtered_subscription : SpecificationWithDirectory {
-		private MiniNode _node;
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class catchup_filtered_subscription<TLogFormat, TStreamId> : SpecificationWithDirectory {
+		private MiniNode<TLogFormat, TStreamId> _node;
 		private IEventStoreConnection _conn;
 		private List<EventData> _testEvents;
 		private List<EventData> _testEventsAfter;
@@ -25,7 +26,7 @@ namespace EventStore.Core.Tests.ClientAPI {
 		[SetUp]
 		public override async Task SetUp() {
 			await base.SetUp();
-			_node = new MiniNode(PathName);
+			_node = new MiniNode<TLogFormat, TStreamId>(PathName);
 			await _node.Start();
 
 			_conn = BuildConnection(_node);
@@ -58,7 +59,7 @@ namespace EventStore.Core.Tests.ClientAPI {
 			await _conn.AppendToStreamAsync("stream-b", ExpectedVersion.NoStream, _testEvents.OddEvents());
 		}
 
-		protected virtual IEventStoreConnection BuildConnection(MiniNode node) {
+		protected virtual IEventStoreConnection BuildConnection(MiniNode<TLogFormat, TStreamId> node) {
 			return TestConnection.Create(node.TcpEndPoint);
 		}
 
@@ -94,7 +95,12 @@ namespace EventStore.Core.Tests.ClientAPI {
 				Assert.Fail("Checkpoint reached not called enough times within time limit.");
 			}
 
-			Assert.AreEqual(10, eventsSeen);
+			if (LogFormatHelper<TLogFormat, TStreamId>.IsV2) {
+				Assert.AreEqual(10, eventsSeen);
+			} else {
+				// accounting for stream records
+				Assert.AreEqual(7, eventsSeen);
+			}
 		}
 
 		[Test]

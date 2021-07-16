@@ -7,7 +7,8 @@ using EventStore.ClientAPI.SystemData;
 using EventStore.Core.Tests.ClientAPI.Helpers;
 
 namespace EventStore.Core.Tests.Http.Streams {
-	public abstract class SpecificationWithLinkToToMaxCountDeletedEvents : HttpBehaviorSpecification {
+	public abstract class SpecificationWithLinkToToMaxCountDeletedEvents<TLogFormat, TStreamId>
+		: HttpBehaviorSpecification<TLogFormat, TStreamId> {
 		protected string LinkedStreamName;
 		protected string DeletedStreamName;
 

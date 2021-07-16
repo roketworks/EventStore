@@ -5,9 +5,10 @@ using EventStore.Core.TransactionLog.LogRecords;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.TransactionLog.Scavenging {
-	[TestFixture]
-	public class when_having_stream_with_max_count_specified : ScavengeTestScenario {
-		protected override DbResult CreateDb(TFChunkDbCreationHelper dbCreator) {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_having_stream_with_max_count_specified<TLogFormat, TStreamId> : ScavengeTestScenario<TLogFormat, TStreamId> {
+		protected override DbResult CreateDb(TFChunkDbCreationHelper<TLogFormat, TStreamId> dbCreator) {
 			return dbCreator
 				.Chunk(Rec.Prepare(0, "$$bla", metadata: new StreamMetadata(maxCount: 3)),
 					Rec.Commit(0, "$$bla"),
@@ -29,8 +30,12 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging {
 		}
 
 		protected override ILogRecord[][] KeptRecords(DbResult dbResult) {
+			var keep = LogFormatHelper<TLogFormat, TStreamId>.IsV2
+				? new int[] { 0, 1, 11, 12, 13, 14 }
+				: new int[] { 0, 1, 2, 12, 13, 14, 15 };
+
 			return new[] {
-				dbResult.Recs[0].Where((x, i) => new[] {0, 1, 11, 12, 13, 14}.Contains(i)).ToArray()
+				dbResult.Recs[0].Where((x, i) => keep.Contains(i)).ToArray(),
 			};
 		}
 

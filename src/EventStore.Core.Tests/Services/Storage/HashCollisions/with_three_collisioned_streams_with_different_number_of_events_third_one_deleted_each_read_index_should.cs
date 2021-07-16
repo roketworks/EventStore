@@ -5,10 +5,11 @@ using NUnit.Framework;
 using ReadStreamResult = EventStore.Core.Services.Storage.ReaderIndex.ReadStreamResult;
 
 namespace EventStore.Core.Tests.Services.Storage.HashCollisions {
-	[TestFixture]
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
 	public class
-		with_three_collisioned_streams_with_different_number_of_events_third_one_deleted_each_read_index_should :
-			ReadIndexTestScenario {
+		with_three_collisioned_streams_with_different_number_of_events_third_one_deleted_each_read_index_should<TLogFormat, TStreamId> :
+			ReadIndexTestScenario<TLogFormat, TStreamId> {
 		private EventRecord[] _prepares1;
 		private EventRecord[] _prepares2;
 		private EventRecord[] _prepares3;
@@ -555,7 +556,9 @@ namespace EventStore.Core.Tests.Services.Storage.HashCollisions {
 
 		[Test]
 		public void return_all_prepares_on_read_all_forward() {
-			var events = ReadIndex.ReadAllEventsForward(new TFPos(0, 0), 100).Records.Select(r => r.Event).ToArray();
+			var events = ReadIndex.ReadAllEventsForward(new TFPos(0, 0), 100).EventRecords()
+				.Select(r => r.Event)
+				.ToArray();
 			Assert.AreEqual(3 + 5 + 7 + 1, events.Length);
 
 			Assert.AreEqual(_prepares1[0], events[0]);
@@ -581,7 +584,8 @@ namespace EventStore.Core.Tests.Services.Storage.HashCollisions {
 
 		[Test]
 		public void return_all_prepares_on_read_all_backward() {
-			var events = ReadIndex.ReadAllEventsBackward(GetBackwardReadPos(), 100).Records.Select(r => r.Event)
+			var events = ReadIndex.ReadAllEventsBackward(GetBackwardReadPos(), 100).EventRecords()
+				.Select(r => r.Event)
 				.ToArray();
 			Assert.AreEqual(3 + 5 + 7 + 1, events.Length);
 

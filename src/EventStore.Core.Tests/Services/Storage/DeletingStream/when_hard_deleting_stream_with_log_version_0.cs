@@ -1,14 +1,17 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using EventStore.Core.TransactionLog.LogRecords;
 using EventStore.Core.Services;
 using System;
 using EventStore.Core.TransactionLog;
 using System.Collections.Generic;
 using System.Linq;
+using EventStore.LogCommon;
 
 namespace EventStore.Core.Tests.Services.Storage.DeletingStream {
-	[TestFixture]
-	public class when_hard_deleting_stream_with_log_version_0 : ReadIndexTestScenario {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint), Ignore = "No such thing as a V0 prepare in LogV3")]
+	public class when_hard_deleting_stream_with_log_version_0<TLogFormat, TStreamId> : ReadIndexTestScenario<TLogFormat, TStreamId> {
+
 		protected override void WriteTestScenario() {
 			WriteSingleEvent("ES1", 0, new string('.', 3000));
 			WriteSingleEvent("ES1", 1, new string('.', 3000));

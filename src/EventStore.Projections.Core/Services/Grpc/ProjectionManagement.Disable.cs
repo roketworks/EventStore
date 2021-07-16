@@ -6,7 +6,7 @@ using EventStore.Projections.Core.Messages;
 using Grpc.Core;
 
 namespace EventStore.Projections.Core.Services.Grpc {
-	public partial class ProjectionManagement {
+	internal partial class ProjectionManagement {
 		private static readonly Operation DisableOperation = new Operation(Operations.Projections.Disable);
 		public override async Task<DisableResp> Disable(DisableReq request, ServerCallContext context) {
 			var disableSource = new TaskCompletionSource<bool>();
@@ -24,8 +24,8 @@ namespace EventStore.Projections.Core.Services.Grpc {
 			var envelope = new CallbackEnvelope(OnMessage);
 
 			_queue.Publish(options.WriteCheckpoint
-				? (Message)new ProjectionManagementMessage.Command.Abort(envelope, name, runAs)
-				: new ProjectionManagementMessage.Command.Disable(envelope, name, runAs));
+				? new ProjectionManagementMessage.Command.Disable(envelope, name, runAs)
+				: (Message)new ProjectionManagementMessage.Command.Abort(envelope, name, runAs));
 
 			await disableSource.Task.ConfigureAwait(false);
 

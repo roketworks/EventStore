@@ -1,14 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using EventStore.Common.Utils;
 using EventStore.Core.Data;
-using EventStore.Core.LogV2;
+using EventStore.Core.LogAbstraction;
 using EventStore.Core.Services;
 using EventStore.Core.TransactionLog.Chunks;
+using EventStore.Core.TransactionLog.Chunks.TFChunk;
 using EventStore.Core.TransactionLog.LogRecords;
+using EventStore.LogCommon;
 
 namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
-	public class TFChunkDbCreationHelper {
+	public class TFChunkDbCreationHelper<TLogFormat, TStreamId> {
 		private readonly TFChunkDbConfig _dbConfig;
 		private readonly TFChunkDb _db;
 
@@ -16,9 +19,12 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 
 		private bool _completeLast;
 
-		public TFChunkDbCreationHelper(TFChunkDbConfig dbConfig) {
+		private static LogFormatAbstractor<TStreamId> _logFormat;
+
+		public TFChunkDbCreationHelper(TFChunkDbConfig dbConfig, LogFormatAbstractor<TStreamId> logFormat) {
 			Ensure.NotNull(dbConfig, "dbConfig");
 			_dbConfig = dbConfig;
+			_logFormat = logFormat;
 
 			_db = new TFChunkDb(_dbConfig);
 			_db.Open();
@@ -27,20 +33,20 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 				throw new Exception("The DB already contains some data.");
 		}
 
-		public TFChunkDbCreationHelper Chunk(params Rec[] records) {
+		public TFChunkDbCreationHelper<TLogFormat, TStreamId> Chunk(params Rec[] records) {
 			_chunkRecs.Add(records);
 			return this;
 		}
 
-		public TFChunkDbCreationHelper CompleteLastChunk() {
+		public TFChunkDbCreationHelper<TLogFormat, TStreamId> CompleteLastChunk() {
 			_completeLast = true;
 			return this;
 		}
 
 		public DbResult CreateDb() {
-			var records = new ILogRecord[_chunkRecs.Count][];
+			var records = new List<ILogRecord>[_chunkRecs.Count];
 			for (int i = 0; i < records.Length; ++i) {
-				records[i] = new ILogRecord[_chunkRecs[i].Length];
+				records[i] = new();
 			}
 
 			var transactions = new Dictionary<int, TransactionInfo>();
@@ -92,6 +98,12 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 					var transInfo = transactions[rec.Transaction];
 					var logPos = _db.Config.WriterCheckpoint.ReadNonFlushed();
 
+					_logFormat.StreamNameIndex.GetOrReserve(_logFormat.RecordFactory, rec.StreamId, logPos, out var streamNumber, out var streamRecord);
+					if (streamRecord != null) {
+						Write(i, chunk, streamRecord, out logPos);
+						records[i].Add(streamRecord);
+					}
+
 					long streamVersion = streamUncommitedVersion[rec.StreamId];
 					if (streamVersion == -1
 					    && rec.Type != Rec.RecType.TransStart
@@ -112,10 +124,10 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 
 					ILogRecord record;
 
-					var expectedVersion = transInfo.FirstPrepareId == rec.Id ? streamVersion : ExpectedVersion.Any;
+					var expectedVersion = transInfo.FirstPrepareId == rec.Id ? streamVersion : ExpectedVersion.NoStream;
 					switch (rec.Type) {
 						case Rec.RecType.Prepare: {
-							record = CreateLogRecord(rec, transInfo, logPos, expectedVersion);
+							record = CreateLogRecord(rec, streamNumber, transInfo, logPos, expectedVersion);
 
 							if (SystemStreams.IsMetastream(rec.StreamId))
 								transInfo.StreamMetadata = rec.Metadata;
@@ -125,7 +137,7 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 						}
 
 						case Rec.RecType.Delete: {
-							record = CreateLogRecord(rec, transInfo, logPos, expectedVersion);
+							record = CreateLogRecord(rec, streamNumber, transInfo, logPos, expectedVersion);
 
 							streamUncommitedVersion[rec.StreamId] = rec.Version == LogRecordVersion.LogRecordV0
 								? int.MaxValue
@@ -135,11 +147,11 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 
 						case Rec.RecType.TransStart:
 						case Rec.RecType.TransEnd: {
-							record = CreateLogRecord(rec, transInfo, logPos, expectedVersion);
+							record = CreateLogRecord(rec, streamNumber, transInfo, logPos, expectedVersion);
 							break;
 						}
 						case Rec.RecType.Commit: {
-							record = CreateLogRecord(rec, transInfo, logPos, expectedVersion);
+							record = CreateLogRecord(rec, streamNumber, transInfo, logPos, expectedVersion);
 
 							if (transInfo.StreamMetadata != null) {
 								var streamId = SystemStreams.OriginalStreamOf(rec.StreamId);
@@ -159,12 +171,8 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 							throw new ArgumentOutOfRangeException();
 					}
 
-					var writerRes = chunk.TryAppend(record);
-					if (!writerRes.Success)
-						throw new Exception(string.Format("Could not write log record: {0}", record));
-					_db.Config.WriterCheckpoint.Write(i * (long)_db.Config.ChunkSize + writerRes.NewPosition);
-
-					records[i][j] = record;
+					Write(i, chunk, record, out logPos);
+					records[i].Add(record);
 				}
 
 				if (i < _chunkRecs.Count - 1 || (_completeLast && i == _chunkRecs.Count - 1))
@@ -173,7 +181,15 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 					chunk.Flush();
 			}
 
-			return new DbResult(_db, records, streams);
+			return new DbResult(_db, records.Select(rs => rs.ToArray()).ToArray(), streams);
+		}
+
+		void Write(int chunkNum, TFChunk chunk, ILogRecord record, out long newPos) {
+			var writerRes = chunk.TryAppend(record);
+			if (!writerRes.Success)
+				throw new Exception(string.Format("Could not write log record: {0}", record));
+			_db.Config.WriterCheckpoint.Write(chunkNum * (long)_db.Config.ChunkSize + writerRes.NewPosition);
+			newPos = _db.Config.WriterCheckpoint.ReadNonFlushed();
 		}
 
 		private byte[] FormatRecordMetadata(Rec rec) {
@@ -183,7 +199,7 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 			return meta.ToJsonBytes();
 		}
 
-		private ILogRecord CreateLogRecord(Rec rec, TransactionInfo transInfo, long logPos, long expectedVersion) {
+		private ILogRecord CreateLogRecord(Rec rec, TStreamId streamId, TransactionInfo transInfo, long logPos, long expectedVersion) {
 			switch (rec.Type) {
 				case Rec.RecType.Prepare: {
 					int transOffset = transInfo.TransactionOffset;
@@ -198,12 +214,12 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 							| (rec.Metadata == null ? PrepareFlags.None : PrepareFlags.IsJson));
 					}
 
-					return LogRecord.Prepare(new LogV2RecordFactory(), logPos,
+					return LogRecord.Prepare(_logFormat.RecordFactory, logPos,
 						Guid.NewGuid(),
 						rec.Id,
 						transInfo.TransactionPosition,
 						transOffset,
-						rec.StreamId,
+						streamId,
 						expectedVersion,
 						rec.PrepareFlags
 						| (transInfo.FirstPrepareId == rec.Id ? PrepareFlags.TransactionBegin : PrepareFlags.None)
@@ -227,12 +243,12 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 							| (transInfo.LastPrepareId == rec.Id ? PrepareFlags.TransactionEnd : PrepareFlags.None));
 					}
 
-					return LogRecord.Prepare(new LogV2RecordFactory(), logPos,
+					return LogRecord.Prepare(_logFormat.RecordFactory, logPos,
 						Guid.NewGuid(),
 						rec.Id,
 						transInfo.TransactionPosition,
 						transOffset,
-						rec.StreamId,
+						streamId,
 						expectedVersion,
 						PrepareFlags.StreamDelete
 						| (transInfo.FirstPrepareId == rec.Id ? PrepareFlags.TransactionBegin : PrepareFlags.None)
@@ -252,12 +268,12 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 							| (transInfo.LastPrepareId == rec.Id ? PrepareFlags.TransactionEnd : PrepareFlags.None));
 					}
 
-					return LogRecord.Prepare(new LogV2RecordFactory(), logPos,
+					return LogRecord.Prepare(_logFormat.RecordFactory, logPos,
 						Guid.NewGuid(),
 						rec.Id,
 						transInfo.TransactionPosition,
 						-1,
-						rec.StreamId,
+						streamId,
 						expectedVersion,
 						(transInfo.FirstPrepareId == rec.Id ? PrepareFlags.TransactionBegin : PrepareFlags.None)
 						| (transInfo.LastPrepareId == rec.Id ? PrepareFlags.TransactionEnd : PrepareFlags.None),
@@ -282,6 +298,9 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 
 		private LogRecord CreateLogRecordV0(Rec rec, TransactionInfo transInfo, int transOffset, long logPos,
 			long expectedVersion, ReadOnlyMemory<byte> data, PrepareFlags flags) {
+
+			LogFormatHelper<TLogFormat, TStreamId>.EnsureV0PrepareSupported();
+
 			return new PrepareLogRecord(logPos,
 				Guid.NewGuid(),
 				rec.Id,

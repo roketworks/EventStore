@@ -5,7 +5,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using EventStore.Core.Bus;
-using EventStore.Core.LogV2;
 using EventStore.Core.Messages;
 using EventStore.Core.Messaging;
 using EventStore.Core.Tests.TransactionLog;
@@ -19,8 +18,9 @@ using EventStore.Core.TransactionLog.LogRecords;
 using System.Threading;
 
 namespace EventStore.Core.Tests.Services.Storage {
-	[TestFixture]
-	public sealed class when_having_an_epoch_manager_and_empty_tf_log : SpecificationWithDirectoryPerTestFixture, IDisposable {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_having_an_epoch_manager_and_empty_tf_log<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture, IDisposable {
 		private TFChunkDb _db;
 		private EpochManager _epochManager;
 		private LinkedList<EpochRecord> _cache;
@@ -29,11 +29,14 @@ namespace EventStore.Core.Tests.Services.Storage {
 		private IBus _mainBus;
 		private readonly Guid _instanceId = Guid.NewGuid();
 		private readonly List<Message> _published = new List<Message>();
-		private static int GetNextEpoch() {
+
+		private int GetNextEpoch() {
 			return (int)Interlocked.Increment(ref _currentEpoch);
 		}
-		private static long _currentEpoch = -1;
+		private long _currentEpoch = -1;
 		private EpochManager GetManager() {
+			var recordFactory = LogFormatHelper<TLogFormat, TStreamId>.RecordFactory;
+
 			return new EpochManager(_mainBus,
 				10,
 				_db.Config.EpochCheckpoint,
@@ -42,7 +45,7 @@ namespace EventStore.Core.Tests.Services.Storage {
 				maxReaderCount: 5,
 				readerFactory: () => new TFChunkReader(_db, _db.Config.WriterCheckpoint,
 					optimizeReadSideCache: _db.Config.OptimizeReadSideCache),
-				new LogV2RecordFactory(),
+				recordFactory,
 				_instanceId);
 		}
 		private LinkedList<EpochRecord> GetCache(EpochManager manager) {
@@ -61,7 +64,7 @@ namespace EventStore.Core.Tests.Services.Storage {
 		[OneTimeSetUp]
 		public override async Task TestFixtureSetUp() {
 			await base.TestFixtureSetUp();
-			_mainBus = new InMemoryBus(nameof(when_having_an_epoch_manager_and_empty_tf_log));
+			_mainBus = new InMemoryBus(nameof(when_having_an_epoch_manager_and_empty_tf_log<TLogFormat, TStreamId>));
 			_mainBus.Subscribe(new AdHocHandler<SystemMessage.EpochWritten>(m => _published.Add(m)));
 			_db = new TFChunkDb(TFChunkHelper.CreateDbConfig(PathName, 0));
 			_db.Open();
@@ -137,7 +140,6 @@ namespace EventStore.Core.Tests.Services.Storage {
 			//epochManager?.Dispose();
 			//reader?.Dispose();
 			_writer?.Dispose();
-			_db?.Close();
 			_db?.Dispose();
 		}
 	}

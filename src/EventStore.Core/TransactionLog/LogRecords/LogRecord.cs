@@ -4,19 +4,9 @@ using EventStore.Common.Utils;
 using EventStore.Core.Data;
 using EventStore.Core.LogAbstraction;
 using EventStore.Core.Services;
+using EventStore.LogCommon;
 
 namespace EventStore.Core.TransactionLog.LogRecords {
-	public enum LogRecordType {
-		Prepare = 0,
-		Commit = 1,
-		System = 2,
-	}
-
-	public class LogRecordVersion {
-		public const byte LogRecordV0 = 0;
-		public const byte LogRecordV1 = 1;
-	}
-
 	public abstract class LogRecord : ILogRecord {
 		public static readonly ReadOnlyMemory<byte> NoData = Empty.ByteArray;
 
@@ -32,20 +22,39 @@ namespace EventStore.Core.TransactionLog.LogRecords {
 			return logicalPosition - length - 2 * sizeof(int);
 		}
 
-		public static LogRecord ReadFrom(BinaryReader reader) {
+		public static ILogRecord ReadFrom(BinaryReader reader, int length) {
 			var recordType = (LogRecordType)reader.ReadByte();
 			var version = reader.ReadByte();
-			var logPosition = reader.ReadInt64();
 
-			Ensure.Nonnegative(logPosition, "logPosition");
+			static long ReadPosition(BinaryReader reader) {
+				var logPosition = reader.ReadInt64();
+				Ensure.Nonnegative(logPosition, "logPosition");
+				return logPosition;
+			}
 
 			switch (recordType) {
 				case LogRecordType.Prepare:
-					return new PrepareLogRecord(reader, version, logPosition);
+					return new PrepareLogRecord(reader, version, ReadPosition(reader));
 				case LogRecordType.Commit:
-					return new CommitLogRecord(reader, version, logPosition);
+					return new CommitLogRecord(reader, version, ReadPosition(reader));
 				case LogRecordType.System:
-					return new SystemLogRecord(reader, version, logPosition);
+					if (version > SystemLogRecord.SystemRecordVersion)
+						return new LogV3EpochLogRecord(LogV3Reader.ReadBytes(recordType, version, reader, length));
+
+					return new SystemLogRecord(reader, version, ReadPosition(reader));
+
+				case LogRecordType.StreamWrite:
+					return new LogV3StreamWriteRecord(LogV3Reader.ReadBytes(recordType, version, reader, length));
+
+				case LogRecordType.Stream:
+					return new LogV3StreamRecord(LogV3Reader.ReadBytes(recordType, version, reader, length));
+
+				case LogRecordType.PartitionType:
+					return new PartitionTypeLogRecord(LogV3Reader.ReadBytes(recordType, version, reader, length));
+				
+				case LogRecordType.Partition:
+					return new PartitionLogRecord(LogV3Reader.ReadBytes(recordType, version, reader, length));
+				
 				default:
 					throw new ArgumentOutOfRangeException("recordType");
 			}
@@ -81,7 +90,7 @@ namespace EventStore.Core.TransactionLog.LogRecords {
 			long expectedVersion) {
 			return factory.CreatePrepare(logPos, correlationId, Guid.NewGuid(), logPos, -1, eventStreamId,
 				expectedVersion,
-				DateTime.UtcNow, PrepareFlags.TransactionBegin, null, NoData, NoData);
+				DateTime.UtcNow, PrepareFlags.TransactionBegin, string.Empty, NoData, NoData);
 		}
 
 		public static IPrepareLogRecord<TStreamId> TransactionWrite<TStreamId>(IRecordFactory<TStreamId> factory, long logPosition, Guid correlationId, Guid eventId,
@@ -97,7 +106,7 @@ namespace EventStore.Core.TransactionLog.LogRecords {
 			long transactionPos, TStreamId eventStreamId) {
 			return factory.CreatePrepare(logPos, correlationId, eventId, transactionPos, -1, eventStreamId,
 				ExpectedVersion.Any,
-				DateTime.UtcNow, PrepareFlags.TransactionEnd, null, NoData, NoData);
+				DateTime.UtcNow, PrepareFlags.TransactionEnd, string.Empty, NoData, NoData);
 		}
 
 		public static IPrepareLogRecord<TStreamId> DeleteTombstone<TStreamId>(IRecordFactory<TStreamId> factory, long logPosition, Guid correlationId, Guid eventId,
@@ -126,16 +135,6 @@ namespace EventStore.Core.TransactionLog.LogRecords {
 			using (var memoryStream = new MemoryStream()) {
 				WriteTo(new BinaryWriter(memoryStream));
 				return 8 + (int)memoryStream.Length;
-			}
-		}
-
-		internal void WriteWithLengthPrefixAndSuffixTo(BinaryWriter writer) {
-			using (var memoryStream = new MemoryStream()) {
-				WriteTo(new BinaryWriter(memoryStream));
-				var length = (int)memoryStream.Length;
-				writer.Write(length);
-				writer.Write(memoryStream.GetBuffer(), 0, (int)memoryStream.Length);
-				writer.Write(length);
 			}
 		}
 	}

@@ -6,18 +6,20 @@ using EventStore.Core.Tests.Helpers;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.ClientAPI {
-	[TestFixture, Category("ClientAPI"), Category("LongRunning")]
-	public class when_having_max_count_set_for_stream : SpecificationWithDirectory {
+	[Category("ClientAPI"), Category("LongRunning")]
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_having_max_count_set_for_stream<TLogFormat, TStreamId> : SpecificationWithDirectory {
 		private const string Stream = "max-count-test-stream";
 
-		private MiniNode _node;
+		private MiniNode<TLogFormat, TStreamId> _node;
 		private IEventStoreConnection _connection;
 		private EventData[] _testEvents;
 
 		[SetUp]
 		public override async Task SetUp() {
 			await base.SetUp();
-			_node = new MiniNode(PathName);
+			_node = new MiniNode<TLogFormat, TStreamId>(PathName);
 			await _node.Start();
 
 			_connection = TestConnection.Create(_node.TcpEndPoint);

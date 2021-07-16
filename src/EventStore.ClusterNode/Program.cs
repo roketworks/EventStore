@@ -2,12 +2,14 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using EventStore.Common.Configuration;
 using EventStore.Common.Exceptions;
 using EventStore.Common.Log;
 using EventStore.Common.Utils;
 using EventStore.Core.Services.Transport.Http;
 using EventStore.Core;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +19,7 @@ using Serilog;
 namespace EventStore.ClusterNode {
 	internal static class Program {
 		public static async Task<int> Main(string[] args) {
+			ThreadPool.SetMaxThreads(1000, 1000);
 			ClusterVNodeOptions options;
 			var exitCodeSource = new TaskCompletionSource<int>();
 			var cts = new CancellationTokenSource();
@@ -35,10 +38,16 @@ namespace EventStore.ClusterNode {
 				var logsDirectory = string.IsNullOrWhiteSpace(options.Application.Log)
 					? Locations.DefaultLogDirectory
 					: options.Application.Log;
-				EventStoreLoggerConfiguration.Initialize(logsDirectory, options.GetComponentName());
+				EventStoreLoggerConfiguration.Initialize(logsDirectory, options.GetComponentName(),
+					options.Application.LogConfig);
 
 				if (options.Application.Help) {
 					await Console.Out.WriteLineAsync(ClusterVNodeOptions.HelpText);
+					return 0;
+				}
+
+				if (options.Application.Version) {
+					await Console.Out.WriteLineAsync(VersionInfo.Text);
 					return 0;
 				}
 
@@ -77,9 +86,7 @@ namespace EventStore.ClusterNode {
 						+ "using the `GossipSeed` option.");
 				}
 
-				if (options.Application.Version || options.Application.WhatIf) {
-					await Console.Out.WriteLineAsync(VersionInfo.Text);
-
+				if (options.Application.WhatIf) {
 					return 0;
 				}
 
@@ -110,6 +117,8 @@ namespace EventStore.ClusterNode {
 								builder.AddEnvironmentVariables().AddCommandLine(args))
 							.ConfigureServices(services => services.AddSingleton<IHostedService>(hostedService))
 							.ConfigureLogging(logging => logging.AddSerilog())
+							.ConfigureServices(services => services.Configure<KestrelServerOptions>(
+								EventStoreKestrelConfiguration.GetConfiguration()))
 							.ConfigureWebHostDefaults(builder => builder
 								.UseKestrel(server => {
 									server.Limits.Http2.KeepAlivePingDelay =
@@ -146,7 +155,9 @@ namespace EventStore.ClusterNode {
 								.ConfigureServices(services => hostedService.Node.Startup.ConfigureServices(services))
 								.Configure(hostedService.Node.Startup.Configure))
 							.RunConsoleAsync(options => options.SuppressStatusMessages = true, cts.Token);
-
+					} catch (Exception ex) {
+						Log.Fatal("Error occurred during setup: {e}", ex);
+						exitCodeSource.TrySetResult(1);
 					} finally {
 						signal.Set();
 					}

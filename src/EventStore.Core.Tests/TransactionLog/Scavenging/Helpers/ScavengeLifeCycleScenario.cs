@@ -1,15 +1,13 @@
 ﻿using System;
 using System.Threading.Tasks;
+using EventStore.Core.LogAbstraction;
 using EventStore.Core.Tests.Services.Storage;
 using EventStore.Core.TransactionLog.Chunks;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
-	abstract class ScavengeLifeCycleScenario : ScavengeLifeCycleScenario<string> {
-	}
-
 	[TestFixture]
-	abstract class ScavengeLifeCycleScenario<TStreamId> : SpecificationWithDirectoryPerTestFixture {
+	abstract public class ScavengeLifeCycleScenario<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
 		protected TFChunkDb Db {
 			get { return _dbResult.Db; }
 		}
@@ -18,12 +16,18 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 		protected TFChunkScavenger<TStreamId> TfChunkScavenger;
 		protected FakeTFScavengerLog Log;
 		protected FakeTableIndex<TStreamId> FakeTableIndex;
+		protected LogFormatAbstractor<TStreamId> _logFormat;
 
 		public override async Task TestFixtureSetUp() {
 			await base.TestFixtureSetUp();
 
+			var indexDirectory = GetFilePathFor("index");
+			_logFormat = LogFormatHelper<TLogFormat, TStreamId>.LogFormatFactory.Create(new() {
+				IndexDirectory = indexDirectory,
+			});
+
 			var dbConfig = TFChunkHelper.CreateSizedDbConfig(PathName, 0, chunkSize: 1024 * 1024);
-			var dbCreationHelper = new TFChunkDbCreationHelper(dbConfig);
+			var dbCreationHelper = new TFChunkDbCreationHelper<TLogFormat, TStreamId>(dbConfig, _logFormat);
 
 			_dbResult = dbCreationHelper
 				.Chunk().CompleteLastChunk()
@@ -37,8 +41,8 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 
 			Log = new FakeTFScavengerLog();
 			FakeTableIndex = new FakeTableIndex<TStreamId>();
-			TfChunkScavenger = new TFChunkScavenger<TStreamId>(_dbResult.Db, Log, FakeTableIndex, new FakeReadIndex<TStreamId>(_ => false),
-				LogFormatHelper<TStreamId>.LogFormat.SystemStreams);
+			TfChunkScavenger = new TFChunkScavenger<TStreamId>(_dbResult.Db, Log, FakeTableIndex, new FakeReadIndex<TLogFormat, TStreamId>(_ => false, _logFormat.Metastreams),
+				_logFormat.Metastreams);
 
 			try {
 				await When().WithTimeout(TimeSpan.FromMinutes(1));
@@ -48,6 +52,7 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging.Helpers {
 		}
 
 		public override Task TestFixtureTearDown() {
+			_logFormat?.Dispose();
 			_dbResult.Db.Close();
 
 			return base.TestFixtureTearDown();

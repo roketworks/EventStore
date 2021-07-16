@@ -6,13 +6,14 @@ using EventStore.Core.TransactionLog.LogRecords;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.TransactionLog.Scavenging {
-	[TestFixture]
-	public class when_metastream_is_scavenged_and_read_index_is_set_to_keep_last_3_metaevents : ScavengeTestScenario {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_metastream_is_scavenged_and_read_index_is_set_to_keep_last_3_metaevents<TLogFormat, TStreamId> : ScavengeTestScenario<TLogFormat, TStreamId> {
 		public when_metastream_is_scavenged_and_read_index_is_set_to_keep_last_3_metaevents() :
 			base(metastreamMaxCount: 3) {
 		}
 
-		protected override DbResult CreateDb(TFChunkDbCreationHelper dbCreator) {
+		protected override DbResult CreateDb(TFChunkDbCreationHelper<TLogFormat, TStreamId> dbCreator) {
 			return dbCreator
 				.Chunk(Rec.Prepare(0, "$$bla"),
 					Rec.Prepare(0, "$$bla"),
@@ -25,9 +26,9 @@ namespace EventStore.Core.Tests.TransactionLog.Scavenging {
 		}
 
 		protected override ILogRecord[][] KeptRecords(DbResult dbResult) {
-			return new[] {
-				dbResult.Recs[0].Where((x, i) => i >= 2).ToArray()
-			};
+			return LogFormatHelper<TLogFormat, TStreamId>.IsV2
+				? new[] { dbResult.Recs[0].Where((x, i) => i >= 2).ToArray() }
+				: new[] { dbResult.Recs[0].Where((x, i) => i == 0 || i >= 3).ToArray() };
 		}
 
 		[Test]

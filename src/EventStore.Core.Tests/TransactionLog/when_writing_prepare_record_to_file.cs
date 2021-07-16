@@ -5,16 +5,18 @@ using EventStore.Core.TransactionLog.Checkpoint;
 using EventStore.Core.TransactionLog.Chunks;
 using EventStore.Core.TransactionLog.FileNamingStrategy;
 using EventStore.Core.TransactionLog.LogRecords;
+using EventStore.LogCommon;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.TransactionLog {
-	[TestFixture]
-	public class when_writing_prepare_record_to_file : SpecificationWithDirectoryPerTestFixture {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_writing_prepare_record_to_file<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
 		private ITransactionFileWriter _writer;
 		private InMemoryCheckpoint _writerCheckpoint;
 		private readonly Guid _eventId = Guid.NewGuid();
 		private readonly Guid _correlationId = Guid.NewGuid();
-		private PrepareLogRecord _record;
+		private IPrepareLogRecord<TStreamId> _record;
 		private TFChunkDb _db;
 
 		[OneTimeSetUp]
@@ -25,12 +27,18 @@ namespace EventStore.Core.Tests.TransactionLog {
 			_db.Open();
 			_writer = new TFChunkWriter(_db);
 			_writer.Open();
-			_record = new PrepareLogRecord(logPosition: 0,
+
+			var recordFactory = LogFormatHelper<TLogFormat, TStreamId>.RecordFactory;
+			var streamId = LogFormatHelper<TLogFormat, TStreamId>.StreamId;
+
+			_record = LogRecord.Prepare(
+				factory: recordFactory,
+				logPosition: 0,
 				eventId: _eventId,
 				correlationId: _correlationId,
-				transactionPosition: 0xDEAD,
+				transactionPos: 0xDEAD,
 				transactionOffset: 0xBEEF,
-				eventStreamId: "WorldEnding",
+				eventStreamId: streamId,
 				expectedVersion: 1234,
 				timeStamp: new DateTime(2012, 12, 21),
 				flags: PrepareFlags.SingleWrite,
@@ -56,17 +64,19 @@ namespace EventStore.Core.Tests.TransactionLog {
 				ILogRecord r;
 				Assert.IsTrue(reader.TryReadNext(out r));
 
-				Assert.True(r is PrepareLogRecord);
-				var p = (PrepareLogRecord)r;
+				var streamId = LogFormatHelper<TLogFormat, TStreamId>.StreamId;
+
+				Assert.True(r is IPrepareLogRecord<TStreamId>);
+				var p = (IPrepareLogRecord<TStreamId>)r;
 				Assert.AreEqual(p.RecordType, LogRecordType.Prepare);
 				Assert.AreEqual(p.LogPosition, 0);
 				Assert.AreEqual(p.TransactionPosition, 0xDEAD);
 				Assert.AreEqual(p.TransactionOffset, 0xBEEF);
 				Assert.AreEqual(p.CorrelationId, _correlationId);
 				Assert.AreEqual(p.EventId, _eventId);
-				Assert.AreEqual(p.EventStreamId, "WorldEnding");
+				Assert.AreEqual(p.EventStreamId, streamId);
 				Assert.AreEqual(p.ExpectedVersion, 1234);
-				Assert.AreEqual(p.TimeStamp, new DateTime(2012, 12, 21));
+				Assert.That(p.TimeStamp, Is.EqualTo(new DateTime(2012, 12, 21)).Within(7).Milliseconds);
 				Assert.AreEqual(p.Flags, PrepareFlags.SingleWrite);
 				Assert.AreEqual(p.EventType, "type");
 				Assert.AreEqual(p.Data.Length, 5);

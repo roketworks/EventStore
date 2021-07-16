@@ -1,14 +1,14 @@
 using System;
 using System.Threading.Tasks;
 using EventStore.Client.Operations;
-using EventStore.Client.Shared;
+using EventStore.Client;
 using EventStore.Core.Messages;
 using EventStore.Core.Messaging;
 using EventStore.Plugins.Authorization;
 using Grpc.Core;
 
 namespace EventStore.Core.Services.Transport.Grpc {
-	partial class Operations {
+	internal partial class Operations {
 		private static readonly Operation ShutdownOperation =
 			new Operation(Plugins.Authorization.Operations.Node.Shutdown);
 

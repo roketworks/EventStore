@@ -7,7 +7,9 @@ using EventStore.Core.Util;
 using static EventStore.Core.Messages.TcpClientMessageDto.Filter;
 
 namespace EventStore.Core.Tests.Services.Storage.AllReader {
-	public class when_reading_all_with_filtering : ReadIndexTestScenario {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_reading_all_with_filtering<TLogFormat, TStreamId> : ReadIndexTestScenario<TLogFormat, TStreamId> {
 		TFPos _forwardReadPos;
 		TFPos _backwardReadPos;
 
@@ -30,7 +32,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.EventType,
 				FilterType.Prefix, new[] {"event-type"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsForwardFiltered(_forwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(2, result.Records.Count);
@@ -41,7 +43,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.EventType,
 				FilterType.Regex, new[] {@"^.*other-event.*$"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsForwardFiltered(_forwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(2, result.Records.Count);
@@ -52,7 +54,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.StreamId,
 				FilterType.Prefix, new[] {"ES2"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsForwardFiltered(_forwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(1, result.Records.Count);
@@ -63,7 +65,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.StreamId,
 				FilterType.Regex, new[] {@"^.*ES2.*$"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsForwardFiltered(_forwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(1, result.Records.Count);
@@ -74,7 +76,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.EventType,
 				FilterType.Prefix, new[] {"event-type"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsBackwardFiltered(_backwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(2, result.Records.Count);
@@ -85,7 +87,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.EventType,
 				FilterType.Regex, new[] {@"^.*other-event.*$"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsBackwardFiltered(_backwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(2, result.Records.Count);
@@ -96,7 +98,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.StreamId,
 				FilterType.Prefix, new[] {"ES2"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsBackwardFiltered(_backwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(1, result.Records.Count);
@@ -107,7 +109,7 @@ namespace EventStore.Core.Tests.Services.Storage.AllReader {
 			var filter = new TcpClientMessageDto.Filter(
 				FilterContext.StreamId,
 				FilterType.Regex, new[] {@"^.*ES2.*$"});
-			var eventFilter = EventFilter.Get(filter);
+			var eventFilter = EventFilter.Get(true, filter);
 
 			var result = ReadIndex.ReadAllEventsBackwardFiltered(_backwardReadPos, 10, 10, eventFilter);
 			Assert.AreEqual(1, result.Records.Count);

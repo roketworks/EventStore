@@ -5,12 +5,11 @@ using System.Threading.Tasks;
 using EventStore.Core.Messages;
 using EventStore.Core.Messaging;
 using EventStore.Client;
-using EventStore.Client.Shared;
 using EventStore.Client.Streams;
 using Grpc.Core;
 
 namespace EventStore.Core.Services.Transport.Grpc {
-	partial class Streams<TStreamId> {
+	internal partial class Streams<TStreamId> {
 		public override async Task<DeleteResp> Delete(DeleteReq request, ServerCallContext context) {
 			var options = request.Options;
 			var streamName = options.StreamIdentifier;

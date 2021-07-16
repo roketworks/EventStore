@@ -21,8 +21,8 @@ using Newtonsoft.Json.Serialization;
 using Newtonsoft.Json.Converters;
 
 namespace EventStore.Core.Tests.Http {
-	public abstract class HttpBehaviorSpecification : SpecificationWithDirectoryPerTestFixture {
-		protected MiniNode _node;
+	public abstract class HttpBehaviorSpecification<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
+		protected MiniNode<TLogFormat, TStreamId> _node;
 		protected IEventStoreConnection _connection;
 		protected HttpResponseMessage _lastResponse;
 		protected string _lastResponseBody;
@@ -73,7 +73,7 @@ namespace EventStore.Core.Tests.Http {
 			get { return _tag; }
 		}
 
-		protected virtual MiniNode CreateMiniNode() =>
+		protected virtual MiniNode<TLogFormat, TStreamId> CreateMiniNode() =>
 			new(PathName);
 
 		protected virtual bool GivenSkipInitializeStandardUsersCheck() => false;

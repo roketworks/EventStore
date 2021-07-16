@@ -16,6 +16,7 @@ using EventStore.Core.TransactionLog.Checkpoint;
 using EventStore.Core.TransactionLog.Chunks;
 using ILogger = Serilog.ILogger;
 using EventStore.Core.TransactionLog.LogRecords;
+using EventStore.LogCommon;
 
 namespace EventStore.Core.Index {
 	public abstract class TableIndex {
@@ -382,7 +383,7 @@ namespace EventStore.Core.Index {
 			}
 		}
 
-		internal void WaitForBackgroundTasks() {
+		public void WaitForBackgroundTasks() {
 			if (!_backgroundRunningEvent.Wait(7000)) {
 				throw new TimeoutException("Waiting for background tasks took too long.");
 			}
@@ -620,7 +621,7 @@ namespace EventStore.Core.Index {
 			return false;
 		}
 
-		public IEnumerable<IndexEntry> GetRange(TStreamId streamId, long startVersion, long endVersion,
+		public IReadOnlyList<IndexEntry> GetRange(TStreamId streamId, long startVersion, long endVersion,
 			int? limit = null) {
 			ulong hash = CreateHash(streamId);
 			var counter = 0;
@@ -639,7 +640,7 @@ namespace EventStore.Core.Index {
 			throw new InvalidOperationException("Files are locked.");
 		}
 
-		private IEnumerable<IndexEntry> GetRangeInternal(ulong hash, long startVersion, long endVersion,
+		private IReadOnlyList<IndexEntry> GetRangeInternal(ulong hash, long startVersion, long endVersion,
 			int? limit = null) {
 			if (startVersion < 0)
 				throw new ArgumentOutOfRangeException("startVersion");

@@ -26,6 +26,7 @@ module.exports = [
         path: "configuration/",
         children: [
             "configuration/",
+            "configuration/auto-configured-options.md"
         ]
     },
     {
@@ -88,6 +89,14 @@ module.exports = [
             "projections/user-defined-projections.md",
             "projections/projections-config.md",
             "projections/debugging.md",
+        ]
+    },
+    {
+        title: "Persistent Subscriptions",
+        collapsable: true,
+        path: "persistent-subscriptions/",
+        children: [
+            "persistent-subscriptions/",
         ]
     },
     {

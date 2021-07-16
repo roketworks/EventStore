@@ -10,8 +10,9 @@ using EventStore.Core.Tests.Services.Replication;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.Services.PersistentSubscription {
-	[TestFixture]
-	public class when_restarting_with_a_connected_subscription : specification_with_a_single_node {
+	[TestFixture(typeof(LogFormat.V2), typeof(string))]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+	public class when_restarting_with_a_connected_subscription<TLogFormat, TStreamId> : specification_with_a_single_node<TLogFormat, TStreamId> {
 		private readonly ManualResetEvent _subscriptionDropped = new ManualResetEvent(false);
 		private readonly ManualResetEvent _serviceStarted = new ManualResetEvent(false);
 		private readonly ManualResetEvent _serviceStopped = new ManualResetEvent(false);
@@ -30,12 +31,12 @@ namespace EventStore.Core.Tests.Services.PersistentSubscription {
 
 			var streamId = Guid.NewGuid().ToString();
 			var group = Guid.NewGuid().ToString();
-			_node.Node.MainQueue.Handle(new ClientMessage.CreatePersistentSubscription(Guid.NewGuid(), Guid.NewGuid(),
+			_node.Node.MainQueue.Handle(new ClientMessage.CreatePersistentSubscriptionToStream(Guid.NewGuid(), Guid.NewGuid(),
 				new FakeEnvelope(), streamId, group, false, 0, 0, false, 0, 20, 20, 10, 1, 1, 10, 1,
 				"RoundRobin",
 				testUser, DateTime.UtcNow));
 
-			_node.Node.MainQueue.Handle(new ClientMessage.ConnectToPersistentSubscription(Guid.NewGuid(),
+			_node.Node.MainQueue.Handle(new ClientMessage.ConnectToPersistentSubscriptionToStream(Guid.NewGuid(),
 				Guid.NewGuid(), new CallbackEnvelope(message => {
 					_subscriptionDropped.Set();
 				}), Guid.NewGuid(), Guid.NewGuid().ToString(), group, streamId, 1, "0",

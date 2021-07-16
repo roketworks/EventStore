@@ -6,7 +6,8 @@ using EventStore.ClientAPI.Common;
 using EventStore.Core.Tests.ClientAPI.Helpers;
 
 namespace EventStore.Core.Tests.Http.Streams {
-	public abstract class HttpSpecificationWithLinkToToEvents : HttpBehaviorSpecification {
+	public abstract class HttpSpecificationWithLinkToToEvents<TLogFormat, TStreamId>
+		: HttpBehaviorSpecification<TLogFormat, TStreamId> {
 		protected string LinkedStreamName;
 		protected string StreamName;
 		protected string Stream2Name;

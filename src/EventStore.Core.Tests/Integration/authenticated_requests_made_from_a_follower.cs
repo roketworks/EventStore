@@ -5,7 +5,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using EventStore.Client.Shared;
+using EventStore.Client;
 using EventStore.Client.Streams;
 using EventStore.ClientAPI;
 using EventStore.ClientAPI.SystemData;
@@ -18,13 +18,15 @@ using Position = EventStore.ClientAPI.Position;
 using StatusCode = Grpc.Core.StatusCode;
 
 namespace EventStore.Core.Tests.Integration {
-	public abstract class authenticated_requests_made_from_a_follower : specification_with_cluster {
+	public abstract class authenticated_requests_made_from_a_follower<TLogFormat, TStreamId> : specification_with_cluster<TLogFormat, TStreamId> {
 		private const string ProtectedStream = "$foo";
 
 		private static readonly string AuthorizationHeaderValue =
 			$"Basic {Convert.ToBase64String(Encoding.ASCII.GetBytes("admin:changeit"))}";
 
-		public class via_http_should : authenticated_requests_made_from_a_follower {
+		[TestFixture(typeof(LogFormat.V2), typeof(string))]
+		[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+		public class via_http_should : authenticated_requests_made_from_a_follower<TLogFormat, TStreamId> {
 			private HttpStatusCode _statusCode;
 
 			protected override async Task Given() {
@@ -64,7 +66,9 @@ namespace EventStore.Core.Tests.Integration {
 			public void work() => Assert.AreEqual(HttpStatusCode.Created, _statusCode);
 		}
 
-		public class via_grpc_should : authenticated_requests_made_from_a_follower {
+		[TestFixture(typeof(LogFormat.V2), typeof(string))]
+		[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+		public class via_grpc_should : authenticated_requests_made_from_a_follower<TLogFormat, TStreamId> {
 			private Status _status;
 
 			protected override async Task Given() {
@@ -79,16 +83,13 @@ namespace EventStore.Core.Tests.Integration {
 							}
 						}, true)
 					});
-
-				var callInvoker = channel.CreateCallInvoker();
-				using var call = callInvoker.AsyncClientStreamingCall(
-					new Method<AppendReq, AppendResp>(MethodType.ClientStreaming, "event_store.client.streams.Streams",
-						"Append", Marshallers.Create(MessageExtensions.ToByteArray, AppendReq.Parser.ParseFrom),
-						Marshallers.Create(MessageExtensions.ToByteArray, AppendResp.Parser.ParseFrom)), default,
-					new CallOptions(credentials: CallCredentials.FromInterceptor((credentials, metadata) => {
+				var streamClient = new Streams.StreamsClient(channel);
+				var call = streamClient.Append(new CallOptions(credentials: CallCredentials.FromInterceptor(
+					(_, metadata) => {
 						metadata.Add("authorization", AuthorizationHeaderValue);
 						return Task.CompletedTask;
 					})));
+				
 
 				await call.RequestStream.WriteAsync(new AppendReq {
 					Options = new AppendReq.Types.Options {
@@ -126,7 +127,9 @@ namespace EventStore.Core.Tests.Integration {
 			public void work() => Assert.AreEqual(StatusCode.OK, _status.StatusCode);
 		}
 
-		public class via_tcp_should : authenticated_requests_made_from_a_follower {
+		[TestFixture(typeof(LogFormat.V2), typeof(string))]
+		[TestFixture(typeof(LogFormat.V3), typeof(uint))]
+		public class via_tcp_should : authenticated_requests_made_from_a_follower<TLogFormat, TStreamId> {
 			private Exception _caughtException;
 
 			protected override async Task Given() {

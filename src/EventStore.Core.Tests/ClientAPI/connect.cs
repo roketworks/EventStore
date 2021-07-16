@@ -8,8 +8,12 @@ using EventStore.Core.Tests.Helpers;
 using NUnit.Framework;
 
 namespace EventStore.Core.Tests.ClientAPI {
-	[TestFixture(TcpType.Normal), TestFixture(TcpType.Ssl), Category("ClientAPI"), Category("LongRunning")]
-	public class connect : SpecificationWithDirectoryPerTestFixture {
+	[Category("ClientAPI"), Category("LongRunning")]
+	[TestFixture(typeof(LogFormat.V2), typeof(string), TcpType.Normal)]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint), TcpType.Normal)]
+	[TestFixture(typeof(LogFormat.V2), typeof(string), TcpType.Ssl)]
+	[TestFixture(typeof(LogFormat.V3), typeof(uint), TcpType.Ssl)]
+	public class connect<TLogFormat, TStreamId> : SpecificationWithDirectoryPerTestFixture {
 		private readonly TcpType _tcpType;
 
 		public connect(TcpType tcpType) {
