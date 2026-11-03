@@ -1,100 +1,193 @@
-# EventStoreDB
+<a href="https://kurrent.io">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./KurrentLogo-White.png">
+    <source media="(prefers-color-scheme: light)" srcset="./KurrentLogo-Black.png">
+    <img alt="Kurrent" src="./KurrentLogo-Plum.png" height="50%" width="50%">
+  </picture>
+</a>
 
-The open-source, functional database with Complex Event Processing in JavaScript.
+- [What is Kurrent](#what-is-kurrent)
+- [What is KurrentDB](#what-is-kurrentdb)
+- [What is Kurrent Cloud](#what-is-kurrent-cloud)
+- [Licensing](#licensing)
+- [Documentation](#docs)
+- [Getting started with KurrentDB](#getting-started-with-kurrentdb)
+- [Getting started with Kurrent Cloud](#getting-started-with-kurrent-cloud)
+- [Client libraries](#client-libraries)
+- [Deployment](#deployment)
+- [Communities](#communities)
+- [Contributing](#contributing)
+- [Building KurrentDB](#building-kurrentdb)
+- [More resources](#more-resources)
 
-This is the repository for the open source version of EventStoreDB, which includes the clustering implementation for high availability. 
+## What is Kurrent
 
-## Support
+Event Store – the company and the product – are rebranding as Kurrent.
 
-Information on support and commercial tools such as LDAP authentication can be found here: [Event Store Support](https://eventstore.com/support/).
+- The flagship product will be referred to as “the Kurrent event-native data platform” or “the Kurrent platform” or simply “Kurrent"
+- EventStoreDB will be referred to as KurrentDB
+- Event Store Cloud will now be called Kurrent Cloud
 
-## CI Status
-![Build](https://github.com/EventStore/EventStore/workflows/Build/badge.svg)
+Read more about the rebrand in the [rebrand FAQ](https://www.kurrent.io/blog/kurrent-re-brand-faq).
 
-## Documentation
-Documentation is located in the [`docs`](/docs) folder. It's orchestrated in the separate [documentation repository](https://github.com/EventStore/documentation). It's available online at https://developers.eventstore.com/.
+## What is KurrentDB
 
-Read more in the [documentation contribution guidelines](./CONTRIBUTING.md#documentation).
+KurrentDB is a database that's engineered for modern software applications and event-driven architectures. Its event-native design simplifies data modeling and preserves data integrity while the integrated streaming engine solves distributed messaging challenges and ensures data consistency.
 
-## Community
-We have a community discussion space at [Event Store Discuss](https://discuss.eventstore.com/). If you prefer Slack, there is also an #eventstore channel in the [DDD-CQRS-ES](https://j.mp/ddd-es-cqrs) Slack community.
+Download the [latest version](https://kurrent.io/downloads).
+For more product information visit [the website](https://kurrent.io/kurrent).
 
-## Release Packages
-The latest release packages are hosted in the downloads section on the Event Store website: [Event Store Downloads](https://eventstore.com/downloads/)
+## What is Kurrent Cloud?
 
-We also host native packages for Linux on [Package Cloud](https://packagecloud.io/EventStore/EventStore-OSS) and Windows packages can be installed via [Chocolatey](https://chocolatey.org/packages/eventstore-oss) (4.0.0 onwards only).
+ Kurrent Cloud is a fully managed cloud offering that's designed to make it easy for developers to build and run highly available and secure applications that incorporate KurrentDB without having to worry about managing the underlying infrastructure. You can provision KurrentDB clusters in AWS, Azure, and GCP, and connect these services securely to your own cloud resources.
 
-## Building EventStoreDB
+For more details visit [the website](https://kurrent.io/kurrent-cloud).
 
-EventStoreDB is written in a mixture of C#, C++ and JavaScript. It can run on Windows, Linux and macOS using the .NET Core runtime. However, the projections library (which uses the V8 javascript engine) contains platform specific code and it must be built for the platform on which you intend to run it.
+## Licensing
 
-### Windows / Linux / macOS
-**Prerequisites**
-- [.NET Core SDK 5.0] (https://dotnet.microsoft.com/download/dotnet/5.0)
+View [KurrentDB's licensing information](https://github.com/kurrent-io/KurrentDB/blob/master/LICENSE.md).
 
-### Build EventStoreDB
-Once you've installed the prerequisites for your system, you can launch a `Release` build of EventStore as follows:
-```
-dotnet build -c Release src/EventStore.sln -f netcoreapp5.0 -r <runtime identifier>
-```
+## Docs
 
-where `<runtime identifier>` needs to be replaced by the [RID of the platform you want to build for](https://docs.microsoft.com/en-us/dotnet/core/rid-catalog).
+For guidance on installation, development, deployment, and administration, see the [User Documentation](https://docs.kurrent.io/).
 
-The build scripts: `build.sh` and `build.ps1` are also available for Linux/macOS and Windows respectively to simplify the build process.
+## Getting started with KurrentDB
 
-To start a single node, you can then run:
-```
-dotnet bin/Release/EventStore.ClusterNode/netcoreapp3.1/<runtime identifier>/EventStore.ClusterNode.dll --db /path/to/db --log /path/to/logs
-```
+Follow the [getting started guide](https://docs.kurrent.io/latest.html).
 
-_Note: The build system has changed after version `5.0.5`, therefore the above instructions will not work for older releases._
+## Getting started with Kurrent Cloud
 
-### Running the tests
-You can launch the tests as follows:
+Kurrent can manage KurrentDB for you, so you don't have to run your own clusters.
+See the online documentation: [Getting started with Kurrent Cloud](https://docs.kurrent.io/cloud/).
 
-```
-dotnet test src/EventStore.sln
-```
+## Client libraries
 
-## Building the EventStoreDB Client / Grpc Client / Embedded Client
-You can build the different clients by following the steps below. This will generate a nuget package file (.nupkg) that you can include in your project.
-#### Client
-```
-dotnet pack -c Release src/EventStore.ClientAPI/EventStore.ClientAPI.csproj /p:Version=6.0.0
-```
+[This guide](https://docs.kurrent.io/clients/grpc/getting-started.html) shows you how to get started with KurrentDB by setting up an instance or cluster and configuring it.
+KurrentDB supports the gRPC protocol.
 
-#### Grpc Client
-```
-dotnet pack -c Release src/EventStore.Grpc/EventStore.Grpc.csproj /p:Version=6.0.0
-```
+### KurrentDB supported clients
 
-#### Embedded Client
-```
-dotnet pack -c Release src/EventStore.ClientAPI.Embedded/EventStore.ClientAPI.Embedded.csproj /p:Version=6.0.0
-```
+- Python: [pyeventsourcing/kurrentdbclient](https://pypi.org/project/kurrentdbclient/)
+- Node.js (javascript/typescript): [kurrent-io/KurrentDB-Client-NodeJS](https://github.com/kurrent-io/KurrentDB-Client-NodeJS)
+- Java: [(kurrent-io/KurrentDB-Client-Java](https://github.com/kurrent-io/KurrentDB-Client-Java)
+- .NET: [kurrent-io/EventStore-Client-Dotnet](https://github.com/kurrent-io/EventStore-Client-Dotnet)
+- Go: [kurrent-io/KurrentDB-Client-Go](https://github.com/kurrent-io/KurrentDB-Client-Go)
+- Rust: [kurrent-io/KurrentDB-Client-Rust](https://github.com/kurrent-io/KurrentDB-Client-Rust)
+- Read more in the [gRPC clients documentation](https://docs.kurrent.io/clients/grpc)
 
+### Community supported clients
 
-## Building the EventStoreDB web UI
-The [web UI repository](https://github.com/EventStore/EventStore.UI) is a git submodule of the current repository located under `src/EventStore.UI`.
+- Elixir: [NFIBrokerage/spear](https://github.com/NFIBrokerage/spear)
+- Ruby: [yousty/event_store_client](https://github.com/yousty/event_store_client)
 
-The web UI is prebuilt and the files are located in [src/EventStore.ClusterNode.Web/clusternode-web](src/EventStore.ClusterNode.Web/clusternode-web). However, if you still want to build the latest web UI, there is a parameter in the `build.sh` (`[<build_ui=yes|no>]`) and `build.ps1` (`-BuildUI`) scripts to allow you to do so.
+Read more in the [documentation](https://docs.kurrent.io/server/latest/quick-start/#protocols-clients-and-sdks).
 
-## Building the Projections Library
-The list of precompiled projections libraries can be found in `src/libs/x64`. If you still want to build the projections library please follow the links below.
-- [Windows](scripts/build-js1/build-js1-win/build-js1-win-instructions.md)
-- [Linux](scripts/build-js1/build-js1-linux/README.md)
-- [macOS](scripts/build-js1/build-js1-mac/build-js1-mac.sh)
+### Legacy clients (support ends with EventStoreDB v23.10 LTS)
+
+- .NET: [EventStoreDB-Client-Dotnet-Legacy](https://github.com/kurrent-io/EventStoreDB-Client-Dotnet-Legacy)
+
+## Deployment
+
+- Kurrent Cloud - [steps to get started in Kurrent Cloud](https://docs.kurrent.io/cloud/).
+- Self-managed - [steps to host KurrentDB yourself](https://docs.kurrent.io/latest/quick-start/installation).
+
+## Communities
+
+[Join our global community](https://www.kurrent.io/community) of developers.
+
+- [Discuss](https://discuss.kurrent.io/)
+- [Discord (Kurrent)](https://discord.gg/Phn9pmCw3t)
+- [Discord (ddd-cqrs-es)](https://discord.com/invite/sEZGSHNNbH)
 
 ## Contributing
 
 Development is done on the `master` branch.
-We attempt to do our best to ensure that the history remains clean and to do so, we generally ask contributors to squash their commits into a set or single logical commit.
+We attempt to do our best to ensure that the history remains clean and to do so, commits are automatically squashed into a single logical commit when pull requests are merged.
 
-If you want to switch to a particular release, you can check out the tag for this particular version. For example:  
-`git checkout oss-v6.0.0-preview1`
+If you want to switch to a particular release, you can check out the release branch for that particular release. For example:
+`git checkout release/v25.0`
 
-Read more in the [contribution guidelines](./CONTRIBUTING.md).
+- [Create an issue](https://github.com/kurrent-io/KurrentDB/issues)
+- [Documentation](https://docs.kurrent.io/)
+- [Contributing guide](CONTRIBUTING.md)
 
-### Proto Changes
+## Building KurrentDB
 
-If you update the protos, continuous integration will fail. After ensuring the proto change is backwards compatible, please run `./protolock.sh commit` at the root of this repository.
+KurrentDB is written in a mixture of C# and JavaScript. It can run on Windows, Linux and macOS (using Docker) using the .NET Core runtime.
+
+**Prerequisites**
+
+- [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)
+
+Once you've installed the prerequisites for your system, you can launch a `Release` build of KurrentDB as follows:
+
+```
+dotnet build -c Release
+```
+
+To start a single node, you can then run:
+
+```
+dotnet run --project ./src/KurrentDB/KurrentDB.csproj -c Release -e ASPNETCORE_ENVIRONMENT=Development -- --dev --db ./tmp/data --index ./tmp/index --log ./tmp/log
+```
+
+Alternatively, you can run the `KurrentDB - Dev DB` profile pre-configured in `launchSettings.json`:
+
+```
+dotnet run --project ./src/KurrentDB/KurrentDB.csproj -c Release -lp "KurrentDB - Dev DB"
+```
+
+### Running the tests
+
+You can launch the tests as follows:
+
+```
+dotnet test --solution KurrentDB.slnx
+```
+
+### Build KurrentDB Docker image
+
+You can also build a Docker image by running the command:
+
+```
+docker build --tag mykurrentdb . \
+--build-arg CONTAINER_RUNTIME={container-runtime}
+--build-arg RUNTIME={runtime}
+```
+
+For instance:
+
+```
+docker build --tag mykurrentdb . \
+--build-arg CONTAINER_RUNTIME=noble \
+--build-arg RUNTIME=linux-x64
+```
+
+**_Note:_** Because of the [Docker issue](https://github.com/moby/buildkit/issues/1900), if you're building a Docker image on Windows, you may need to set the `DOCKER_BUILDKIT=0` environment variable. For instance, running in PowerShell:
+
+```
+$env:DOCKER_BUILDKIT=0; docker build --tag mykurrentdb . `
+--build-arg CONTAINER_RUNTIME=noble `
+--build-arg RUNTIME=linux-x64
+```
+
+Currently, we support the following configurations:
+
+1. Noble:
+
+- `CONTAINER_RUNTIME=noble`
+- `RUNTIME=linux-x64`
+
+You can verify the built image by running:
+
+```
+docker run --rm mykurrentdb --insecure --what-if
+```
+
+## More resources
+
+- [Release notes](https://docs.kurrent.io/server/latest/release-schedule/release-notes.html)
+- [Beginners Guide to Event Sourcing](https://kurrent.io/event-sourcing)
+- [Articles](https://kurrent.io/blog)
+- [Webinars](https://kurrent.io/webinars)
+- [Contact us](https://kurrent.io/contact)

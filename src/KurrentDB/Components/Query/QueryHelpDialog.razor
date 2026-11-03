@@ -1,0 +1,71 @@
+@using KurrentDB.UI.Services
+@inject Preferences Preferences
+
+<MudDialog Style="height: 70%;">
+	<DialogContent>
+		<MudMarkdown Styling="@_styling" Value="@HelpText"/>
+	</DialogContent>
+	<DialogActions>
+		<MudButton Color="Color.Primary" OnClick="Ok">Close</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	readonly MudMarkdownStyling _styling = new();
+
+	protected override void OnInitialized() {
+		base.OnInitialized();
+		var theme = Preferences.DarkMode ? CodeBlockTheme.GithubDark : CodeBlockTheme.StackoverflowLight;
+		_styling.CodeBlock.Theme = theme;
+	}
+
+	[CascadingParameter] private IMudDialogInstance MudDialog { get; set; }
+
+	private void Ok() => MudDialog.Close(DialogResult.Ok(true));
+
+	const string HelpText = @"
+##### Available sources
+
+Query log records from default or user-defined index.
+
+**Beware that querying the whole log will trigger a full log scan, which impact performance of the database.**
+
+| Source | Description | Example |
+|----------|------------|-------------|
+| `kdb.records` | Query default index | `select * from kdb.records where stream='Order-123'` |
+| `usr.<user-index-name>` | Query user-defined index | `select * from usr.MyIndex where field_country='Mauritius'` |
+
+**Consider adding `limit` to the query to constrain the scan surface.**
+
+##### Available columns
+
+You can use top-level predicates as well as JSON predicates on payload and metadata.
+
+Top-level predicates are available on:
+* `log_position`: commit position (bigint)
+* `stream`: stream name (varchar)
+* `category`: stream category (varchar)
+* `schema_name`: schema name (varchar)
+* `stream_revision`: record number in a stream (int)
+* `created_at`: record append time (Unix timestamp, in millis)
+
+JSON predicates are available on:
+* `data`: record payload
+* `metadata`: custom record metadata
+
+##### Example query
+
+The query will find all records from a category `Telemetry` where the `Version` property is set, and then count the number of
+streams per found version value.
+```
+select version, count(*) as count from (
+  select distinct version, stream from (
+    select data->>'Version' as version, stream
+	from kdb.records
+    where version is not null and category='Telemetry'
+  )
+) group by version
+```
+";
+
+}

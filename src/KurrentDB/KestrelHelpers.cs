@@ -1,0 +1,97 @@
+// Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements.
+// Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md).
+
+using System;
+using System.IO;
+using System.Net.Security;
+using System.Threading.Tasks;
+using KurrentDB.Common.Utils;
+using KurrentDB.Core;
+using KurrentDB.Core.Services.Transport.Http;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Serilog;
+using RuntimeInformation = System.Runtime.RuntimeInformation;
+
+namespace KurrentDB;
+
+public static class KestrelHelpers {
+	public static void ConfigureHttpOptions(ListenOptions listenOptions, ClusterVNodeHostedService hostedService, bool useHttps) {
+		listenOptions.UseConnectionInterceptors();
+
+		if (useHttps)
+			listenOptions.UseHttps(CreateServerOptionsSelectionCallback(hostedService), null);
+		else
+			listenOptions.Use(next => new ClearTextHttpMultiplexingMiddleware(next).OnConnectAsync);
+	}
+
+	public static void TryListenOnUnixSocket(ClusterVNodeHostedService hostedService, KestrelServerOptions server) {
+		if (hostedService.Node.Db.Config.InMemDb) {
+			Log.Information("Not listening on a UNIX domain socket since the database is running in memory.");
+			return;
+		}
+
+		if (!RuntimeInformation.IsLinux && !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17063)) {
+			Log.Error("Not listening on a UNIX domain socket since it is not supported by the operating system.");
+			return;
+		}
+
+		try {
+			var legacyUnixSocket = Path.GetFullPath(Path.Combine(hostedService.Node.Db.Config.Path, "eventstore.sock"));
+			var unixSocket = Path.GetFullPath(Path.Combine(hostedService.Node.Db.Config.Path, "kurrent.sock"));
+
+			CleanupStaleSocket(legacyUnixSocket);
+			CleanupStaleSocket(unixSocket);
+
+			server.ListenUnixSocket(unixSocket, listenOptions => {
+				listenOptions.Use(next => new UnixSocketConnectionMiddleware(next).OnConnectAsync);
+				ConfigureHttpOptions(listenOptions, hostedService, useHttps: false);
+			});
+			Log.Information("Listening on UNIX domain socket: {unixSocket}", unixSocket);
+		} catch (Exception ex) {
+			Log.Error(ex, "Failed to listen on UNIX domain socket.");
+			throw;
+		}
+
+		return;
+
+		static void CleanupStaleSocket(string socketPath) {
+			if (File.Exists(socketPath)) {
+				try {
+					File.Delete(socketPath);
+					Log.Information("Cleaned up stale UNIX domain socket: {unixSocket}", socketPath);
+				} catch (Exception ex) {
+					Log.Error(ex, "Failed to clean up stale UNIX domain socket: {unixSocket}. Please delete the file manually.", socketPath);
+					throw;
+				}
+			}
+		}
+	}
+
+	public static ServerOptionsSelectionCallback CreateServerOptionsSelectionCallback(ClusterVNodeHostedService hostedService) {
+		return (_, _, _, _) => {
+			var serverOptions = new SslServerAuthenticationOptions {
+				ServerCertificateContext = SslStreamCertificateContext.Create(
+					hostedService.Node.CertificateSelector(),
+					hostedService.Node.IntermediateCertificatesSelector(),
+					offline: true),
+				ClientCertificateRequired = true, // request a client certificate but it's not necessary for the client to supply one
+				RemoteCertificateValidationCallback = NodeTlsPolicy.ForClientCertificate((certificate, chain, sslPolicyErrors) => {
+					if (certificate is null)
+						return (true, null);
+
+					return hostedService.Node.InternalClientCertificateValidator(
+						certificate,
+						chain,
+						sslPolicyErrors);
+				}),
+				CertificateRevocationCheckMode = NodeTlsPolicy.CertificateRevocationCheckMode,
+				EnabledSslProtocols = NodeTlsPolicy.SystemSslProtocols,
+				ApplicationProtocols = [SslApplicationProtocol.Http2, SslApplicationProtocol.Http11],
+				AllowRenegotiation = NodeTlsPolicy.AllowRenegotiation
+			};
+
+			return ValueTask.FromResult(serverOptions);
+		};
+	}
+}

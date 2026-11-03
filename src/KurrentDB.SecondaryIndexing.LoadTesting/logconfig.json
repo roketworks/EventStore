@@ -1,0 +1,13 @@
+{
+	"Logging": {
+		"LogLevel": {
+			"Amazon": "Warning",
+			"Default": "Debug",
+			"KurrentDB.Core.Services.Transport.Enumerators": "Information",
+			"KurrentDB.Projections.Core.Services.Processing.V2": "Information",
+			"Grpc": "Critical",
+			"Microsoft": "Warning",
+			"System": "Warning"
+		}
+	}
+}

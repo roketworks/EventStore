@@ -1,0 +1,86 @@
+// Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements.
+// Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md).
+
+using Kurrent.Quack;
+using Kurrent.Quack.ConnectionPool;
+using KurrentDB.Core.Services.Transport.Enumerators;
+using KurrentDB.SecondaryIndexing.LoadTesting.Appenders;
+using KurrentDB.SecondaryIndexing.Storage;
+using KurrentDB.SecondaryIndexing.Tests.Generators;
+using Serilog;
+using Stopwatch = System.Diagnostics.Stopwatch;
+
+namespace KurrentDB.SecondaryIndexing.LoadTesting.Environments.DuckDB;
+
+public class RawQuackMessageBatchAppender : IMessageBatchAppender {
+	private readonly int _commitSize;
+	private readonly Stopwatch _sw = new();
+
+	private Appender _defaultIndexAppender;
+
+	private static readonly ILogger Logger = Log.Logger.ForContext<RawQuackMessageBatchAppender>();
+
+	public long LastCommittedSequence;
+	public long LastSequence;
+
+	public RawQuackMessageBatchAppender(DuckDBConnectionPool db, DuckDbTestEnvironmentOptions options) {
+		_commitSize = options.CommitSize;
+		var schema = new IndexingDbSchema(static (_, _) => Enumerable.Empty<ReadResponse>().GetEnumerator());
+
+		using (db.Rent(out var rentedConn)) {
+			schema.Execute(rentedConn);
+		}
+
+		using var connection = db.Open();
+		_defaultIndexAppender = new(connection, "idx_all"u8);
+
+		if (!string.IsNullOrEmpty(options.WalAutoCheckpoint)) {
+			using var cmd = connection.CreateCommand();
+			cmd.CommandText = $"PRAGMA wal_autocheckpoint = '{options.WalAutoCheckpoint}'";
+			cmd.ExecuteNonQuery();
+		}
+	}
+
+	public ValueTask Append(TestMessageBatch batch) {
+		return AppendToDefaultIndex(batch);
+	}
+
+	public ValueTask AppendToDefaultIndex(TestMessageBatch batch) {
+		foreach (var (eventNumber, logPosition, _, _, _) in batch.Messages) {
+			LastSequence++;
+
+			using (var row = _defaultIndexAppender.CreateRow()) {
+				row.Add(logPosition);
+				row.AddDefault();
+				row.Add(eventNumber);
+				row.Add(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+				row.AddDefault();
+				row.Add(1); //stream.Id
+				row.Add(1); //eventType.Id
+				row.Add(1); //category.Id
+				row.AddDefault();
+			}
+
+			if (LastSequence < LastCommittedSequence + _commitSize)
+				continue;
+
+			LastCommittedSequence = LastSequence;
+			try {
+				_sw.Restart();
+				_defaultIndexAppender.Flush();
+				_sw.Stop();
+				Logger.Debug("Committed {Count} records to index at seq {Seq} ({Took} ms)", _commitSize, LastSequence, _sw.ElapsedMilliseconds);
+			} catch (Exception e) {
+				Logger.Error(e, "Failed to commit {Count} records to index at sequence {Seq}", _commitSize, LastSequence);
+				throw;
+			}
+		}
+
+		return ValueTask.CompletedTask;
+	}
+
+	public ValueTask DisposeAsync() {
+		_defaultIndexAppender.Dispose();
+		return ValueTask.CompletedTask;
+	}
+}

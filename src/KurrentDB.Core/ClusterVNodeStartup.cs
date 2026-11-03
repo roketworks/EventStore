@@ -1,0 +1,398 @@
+// Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements.
+// Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md).
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
+using System.IO.Compression;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using EventStore.Core.Services.Transport.Grpc;
+using EventStore.Core.Services.Transport.Grpc.Cluster;
+using EventStore.Plugins;
+using EventStore.Plugins.Authentication;
+using EventStore.Plugins.Authorization;
+using KurrentDB.Common.Compression;
+using KurrentDB.Common.Configuration;
+using KurrentDB.Common.Utils;
+using KurrentDB.Core.Bus;
+using KurrentDB.Core.DuckDB;
+using KurrentDB.Core.Messages;
+using KurrentDB.Core.Metrics;
+using KurrentDB.Core.Services.Storage.ReaderIndex;
+using KurrentDB.Core.Services.Transport.Grpc;
+using KurrentDB.Core.Services.Transport.Http;
+using KurrentDB.Core.TransactionLog.Checkpoint;
+using KurrentDB.Core.TransactionLog.Chunks;
+using KurrentDB.DataPlane.Transport.Grpc;
+using KurrentDB.KontrolPlane.Transport.Grpc;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using Serilog;
+using AuthenticationMiddleware = KurrentDB.Core.Services.Transport.Http.AuthenticationMiddleware;
+using AuthorizationOperations = EventStore.Plugins.Authorization.Operations;
+using ClientGossip = EventStore.Core.Services.Transport.Grpc.Gossip;
+using ClusterGossip = EventStore.Core.Services.Transport.Grpc.Cluster.Gossip;
+using HttpMethod = KurrentDB.Transport.Http.HttpMethod;
+using Operations = EventStore.Core.Services.Transport.Grpc.Operations;
+using ServerFeatures = KurrentDB.Core.Services.Transport.Grpc.ServerFeatures;
+
+#nullable enable
+
+namespace KurrentDB.Core;
+
+public class ClusterVNodeStartup<TStreamId>
+	: IInternalStartup,
+		IHandle<SystemMessage.SystemStart>,
+		IHandle<SystemMessage.SystemReady>,
+		IHandle<SystemMessage.BecomeShuttingDown> {
+	private readonly ClusterVNodeOptions _options;
+	private readonly IReadOnlyList<IPlugableComponent> _plugableComponents;
+	private readonly IPublisher _mainQueue;
+	private readonly IPublisher _monitoringQueue;
+	private readonly ISubscriber _mainBus;
+	private readonly IAuthenticationProvider _authenticationProvider;
+	private readonly IExpiryStrategy _expiryStrategy;
+	private readonly KestrelHttpService _httpService;
+	private readonly IConfiguration _configuration;
+	private readonly MetricsConfiguration _metricsConfiguration;
+	private readonly Trackers _trackers;
+	private readonly StatusCheck _statusCheck;
+	private readonly Func<IServiceCollection, IServiceCollection> _configureNodeServices;
+	private readonly Action<IApplicationBuilder> _configureNode;
+	private static readonly Operation KontrolPlaneOperation = new(AuthorizationOperations.Node.KontrolPlane.Access);
+	private static readonly Operation DataPlaneOperation = new(AuthorizationOperations.Node.DataPlane.Access);
+
+	private bool _initialized;
+	private bool _ready;
+	private readonly IAuthorizationProvider _authorizationProvider;
+	private readonly IPublisher _httpMessageHandler;
+	private readonly string? _clusterDns;
+	private readonly IReadOnlyCheckpoint _databaseTag;
+
+	public ClusterVNodeStartup(
+		ClusterVNodeOptions options,
+		IReadOnlyList<IPlugableComponent> plugableComponents,
+		IPublisher mainQueue,
+		IPublisher monitoringQueue,
+		ISubscriber mainBus,
+		IPublisher httpMessageHandler,
+		IAuthenticationProvider authenticationProvider,
+		IAuthorizationProvider authorizationProvider,
+		IExpiryStrategy expiryStrategy,
+		KestrelHttpService httpService,
+		IConfiguration configuration,
+		IReadOnlyCheckpoint databaseTag,
+		Trackers trackers,
+		Func<IServiceCollection, IServiceCollection> configureNodeServices,
+		Action<IApplicationBuilder> configureNode) {
+		_options = options;
+		_plugableComponents = plugableComponents;
+		_mainQueue = mainQueue;
+		_monitoringQueue = monitoringQueue ?? throw new ArgumentNullException(nameof(monitoringQueue));
+		_mainBus = mainBus ?? throw new ArgumentNullException(nameof(mainBus));
+		_httpMessageHandler = httpMessageHandler;
+		_authenticationProvider = authenticationProvider;
+		_authorizationProvider = authorizationProvider ?? throw new ArgumentNullException(nameof(authorizationProvider));
+		_expiryStrategy = expiryStrategy;
+		_httpService = Ensure.NotNull(httpService);
+		_configuration = Ensure.NotNull(configuration);
+		_databaseTag = databaseTag;
+		_metricsConfiguration = MetricsConfiguration.Get(_configuration);
+		_trackers = trackers;
+		_clusterDns = options.Cluster.DiscoverViaDns ? options.Cluster.ClusterDns : null;
+		_configureNodeServices = configureNodeServices ?? throw new ArgumentNullException(nameof(configureNodeServices));
+		_configureNode = configureNode ?? throw new ArgumentNullException(nameof(configureNode));
+		_statusCheck = new StatusCheck(this);
+	}
+
+	public void Configure(WebApplication app) {
+		_configureNode(app);
+
+		var forcePlainTextMetrics = _metricsConfiguration is { LegacyCoreNaming: true, LegacyProjectionsNaming: true };
+
+		var internalDispatcher = new InternalDispatcherEndpoint(_mainQueue, _httpMessageHandler);
+		_mainBus.Subscribe(internalDispatcher);
+
+		_statusCheck.MapLiveness(app.MapGroup("/health"));
+		app.UseCors("default");
+
+		// AuthenticationMiddleware uses _httpAuthenticationProviders and assigns
+		// the resulting ClaimsPrinciple to HttpContext.User
+		app.UseMiddleware<AuthenticationMiddleware>();
+
+		// UseAuthentication/UseAuthorization allow the rest of the pipeline to access auth
+		// in a conventional way (e.g. with AuthorizeAttribute). The server doesn't make use
+		// of this yet but plugins may. The registered authentication scheme (kurrent auth)
+		// is driven by the HttpContext.User established above
+		app.UseAuthentication();
+		app.UseRouting();
+		app.UseMiddleware<GrpcStreamingShutdownMiddleware>();
+		app.UseAuthorization();
+		app.UseAntiforgery();
+
+		// provides a lazy DuckDB connection pool unique to the connection
+		app.UseDuckDb();
+
+		// allow all subsystems to register their legacy controllers before calling MapLegacyHttp
+		foreach (var component in _plugableComponents)
+			component.ConfigureApplication(app, _configuration);
+
+		_authenticationProvider.ConfigureEndpoints(app);
+
+		app.MapLegacyPipeline(_httpService, internalDispatcher, forcePlainTextMetrics);
+
+		app.MapGrpcService<PersistentSubscriptions>();
+		app.MapGrpcService<Users>();
+		app.MapGrpcService<Streams<TStreamId>>();
+		app.MapGrpcService<ClusterGossip>();
+		app.MapGrpcService<Elections>();
+		app.MapGrpcService<Operations>();
+		app.MapGrpcService<ClientGossip>();
+		app.MapGrpcService<Monitoring>();
+		app.MapGrpcService<ServerFeatures>();
+
+		if (_options.KontrolPlane.IsKontrolPlaneNode)
+			app.MapGrpcService<GrpcKontrollerServer>().RequireAuthorization(RequireOperation(KontrolPlaneOperation));
+
+		if (_options.KontrolPlane.IsDataPlaneNode)
+			app.MapGrpcService<GrpcDataPlaneServer>().RequireAuthorization(RequireOperation(DataPlaneOperation));
+
+		Action<Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder> RequireOperation(Operation operation) =>
+			policy => policy.RequireAssertion(async context =>
+				await _authorizationProvider.CheckAccessAsync(context.User, operation, CancellationToken.None));
+
+#if DEBUG
+		app.MapGrpcReflectionService();
+#endif
+
+		// enable redaction service on unix sockets only
+		app.MapGrpcService<Redaction>().AddEndpointFilter(async (c, next) => {
+			if (!c.HttpContext.IsUnixSocketConnection())
+				return Results.BadRequest("Redaction is only available via Unix Sockets");
+			return await next(c).ConfigureAwait(false);
+		});
+	}
+
+	public void ConfigureServices(IServiceCollection services) {
+		// Web-related registrations
+		services.AddRouting();
+
+		// Scope Data Protection (which protects the UI auth cookie) to this database's id, so a cookie minted
+		// against one database isn't accepted after the server is restarted on a different database at the same
+		// endpoint. The keys themselves stay in the default per-user store — only the non-secret discriminator
+		// is derived from the database id, so tag.chk leaking can't be used to forge cookies.
+		services
+			.AddDataProtection()
+			.SetApplicationName($"KurrentDB-UI:{_databaseTag.Read():X}");
+
+		var authBuilder = services.AddAuthentication(o => {
+			o.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+			if (OAuthEnabled) {
+				o.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+			}
+
+			o.AddScheme<EventStoreAuthenticationHandler>("kurrent auth", displayName: null);
+		});
+		if (OAuthEnabled) {
+			var oidcConfig = _configuration.GetSection("KurrentDB:OAuth");
+			authBuilder
+				.AddCookie()
+				.AddOpenIdConnect(o => {
+					var insecure = bool.TryParse(oidcConfig["Insecure"], out var insecureValue) && insecureValue;
+					o.Authority = oidcConfig["Issuer"];
+					o.ClientId = oidcConfig["ClientId"];
+					o.ClientSecret = oidcConfig["ClientSecret"];
+					o.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+					o.SignOutScheme = OpenIdConnectDefaults.AuthenticationScheme;
+					o.ResponseType = OpenIdConnectResponseType.Code;
+					if (insecure) {
+						o.BackchannelHttpHandler = new HttpClientHandler {
+							ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+						};
+						o.RequireHttpsMetadata = false;
+					}
+
+					o.SaveTokens = true;
+					o.GetClaimsFromUserInfoEndpoint = true;
+					o.TokenValidationParameters.NameClaimType = JwtRegisteredClaimNames.Name;
+					o.Events.OnUserInformationReceived = async ctx => {
+						if (ctx.Principal != null) {
+							await ctx.HttpContext.SignInAsync(ctx.Principal, ctx.Properties);
+						}
+					};
+				});
+		} else {
+			authBuilder.AddCookie(options => {
+				options.LoginPath = "/ui/login";
+				options.AccessDeniedPath = "/ui/access-denied";
+			});
+		}
+
+		services.AddAuthorization();
+		services.AddAntiforgery(s => s.Cookie.Expiration = TimeSpan.Zero);
+		services
+			.AddSingleton<AuthenticationMiddleware>()
+			.AddSingleton<AuthorizationMiddleware>()
+			.AddSingleton(new KestrelToInternalBridgeMiddleware(_httpService.UriRouter, _httpService.LogHttpRequests, _httpService.AdvertiseAsHost, _httpService.AdvertiseAsPort))
+			.AddSingleton(_authenticationProvider)
+			.AddSingleton(_authorizationProvider);
+		services.AddCors(o => o.AddPolicy(
+			"default",
+			b => b.AllowAnyOrigin().WithMethods(HttpMethod.Options, HttpMethod.Get).AllowAnyHeader())
+		);
+
+		// Other dependencies
+		services
+			.TryAddSingleton(TimeProvider.System);
+
+		services
+			.AddSingleton(_options)
+			.AddSingleton(_metricsConfiguration)
+			.AddSingleton<ISubscriber>(_mainBus)
+			.AddSingleton<IPublisher>(_mainQueue)
+			.AddSingleton<ISystemClient, SystemClient>()
+			.AddSingleton(new Streams<TStreamId>(_mainQueue,
+				Ensure.Positive(_options.Application.MaxAppendSize),
+				Ensure.Positive(_options.Application.MaxAppendEventSize),
+				TimeSpan.FromMilliseconds(_options.Database.WriteTimeoutMs),
+				_expiryStrategy, _trackers.GrpcTrackers, _authorizationProvider))
+			.AddSingleton(new PersistentSubscriptions(_mainQueue, _authorizationProvider))
+			.AddSingleton(new Users(_mainQueue, _authorizationProvider))
+			.AddSingleton(new Operations(_mainQueue, _authorizationProvider))
+			.AddSingleton(new ClusterGossip(_mainQueue, _authorizationProvider, _clusterDns,
+				updateTracker: _trackers.GossipTrackers.ProcessingPushFromPeer,
+				readTracker: _trackers.GossipTrackers.ProcessingRequestFromPeer))
+			.AddSingleton(new Elections(_mainQueue, _authorizationProvider, _clusterDns))
+			.AddSingleton(new ClientGossip(_mainQueue, _authorizationProvider, _trackers.GossipTrackers.ProcessingRequestFromGrpcClient))
+			.AddSingleton(new Monitoring(_monitoringQueue))
+			.AddKeyedSingleton<IPublisher>(KeyedServices.MonitoringQueuePublisher, _monitoringQueue)
+			.AddSingleton(new Redaction(_mainQueue, _authorizationProvider))
+			.AddSingleton<ServerFeatures>();
+
+		// OpenTelemetry
+		services.AddOpenTelemetry()
+			// Configure resource ONCE at the top level - applies to ALL signals
+			.ConfigureResource(resource => resource
+				.AddService(_metricsConfiguration.ServiceName)
+				.AddEnvironmentVariableDetector())
+			.WithMetrics(meterOptions => meterOptions
+				.AddAspNetCoreInstrumentation()
+				.AddMeter(_metricsConfiguration.Meters)
+				.AddView(ViewConfig)
+				.AddInternalExporter()
+				.AddPrometheusExporter(options => {
+					if (_metricsConfiguration is { LegacyCoreNaming: true, LegacyProjectionsNaming: true }) {
+						options.DisableTotalNameSuffixForCounters = true;
+					} else if (_metricsConfiguration.LegacyCoreNaming || _metricsConfiguration.LegacyProjectionsNaming) {
+						Log.Error("Inconsistent Meter names: {names}. Please use EventStore or KurrentDB for all.",
+							string.Join(", ", _metricsConfiguration.Meters));
+					}
+
+					options.ScrapeResponseCacheDurationMilliseconds = 1000;
+				}));
+
+		// gRPC
+		services
+			.AddSingleton<LogRetriesInterceptor>()
+			.AddSingleton(new NotReadyInterceptor(() => _initialized))
+			.AddGrpc(options => {
+				var hostEnvironment = services
+					.BuildServiceProvider()
+					.GetRequiredService<IHostEnvironment>();
+
+				options.EnableDetailedErrors = hostEnvironment.IsDevelopment()
+											|| hostEnvironment.IsStaging()
+											|| _options.DevMode.Dev;
+
+				options.Interceptors.Add<LogRetriesInterceptor>();
+
+				// gRPC response compression (gzip). The client must still opt in by advertising gzip in
+				// grpc-accept-encoding, and cannot override the level — it's a server-side setting.
+				// The provider is always registered so gzip-compressed client requests can be decompressed,
+				// but responses are only compressed when the level is not NoCompression.
+				var compressionLevel = _options.Grpc.CompressionLevel;
+				options.CompressionProviders.Add(new Rfc1952GzipCompressionProvider(compressionLevel));
+				if (compressionLevel != CompressionLevel.NoCompression) {
+					options.ResponseCompressionAlgorithm = "gzip";
+					options.ResponseCompressionLevel = compressionLevel;
+				}
+			})
+			.AddServiceOptions<GrpcKontrollerServer>(options => options.Interceptors.Add<NotReadyInterceptor>())
+			.AddServiceOptions<GrpcDataPlaneServer>(options => options.Interceptors.Add<NotReadyInterceptor>())
+			.AddServiceOptions<Streams<TStreamId>>(options => options.MaxReceiveMessageSize = TFConsts.EffectiveMaxLogRecordSize);
+
+#if DEBUG
+		services.AddGrpcReflection();
+#endif
+
+		services.AddDuckDb();
+
+		// Ask the node itself to add DI registrations
+		_configureNodeServices(services);
+
+		// Let pluggable components to register their services
+		foreach (var component in _plugableComponents)
+			component.ConfigureServices(services, _configuration);
+
+		return;
+
+		MetricStreamConfiguration? ViewConfig(Instrument i) {
+			if (i.Name == MetricsBootstrapper.LogicalChunkReadDistributionName(_metricsConfiguration.ServiceName))
+				// 20 buckets, 0, 1, 2, 4, 8, ...
+				return new ExplicitBucketHistogramConfiguration { Boundaries = [0, .. Enumerable.Range(0, count: 19).Select(x => 1 << x)] };
+			if (i.Name.StartsWith(_metricsConfiguration.ServiceName + "-") &&
+				(i.Name.EndsWith("-latency-seconds") || i.Name.EndsWith("-latency") && i.Unit == "seconds"))
+				return MetricsConfiguration.LatencySecondsHistogramBucketConfiguration;
+			if (i.Name.StartsWith(_metricsConfiguration.ServiceName + "-") && (i.Name.EndsWith("-seconds") || i.Unit == "seconds"))
+				return MetricsConfiguration.SecondsHistogramBucketConfiguration;
+			return default;
+		}
+	}
+
+	public void Handle(SystemMessage.SystemStart _) => _initialized = true;
+
+	public void Handle(SystemMessage.SystemReady _) => _ready = true;
+
+	public void Handle(SystemMessage.BecomeShuttingDown _) {
+		_initialized = false;
+		_ready = false;
+	}
+
+	private class StatusCheck(ClusterVNodeStartup<TStreamId> startup) {
+		private readonly ClusterVNodeStartup<TStreamId> _startup = startup ?? throw new ArgumentNullException(nameof(startup));
+		private const int Livecode = 204;
+
+		public void MapLiveness(RouteGroupBuilder builder) {
+			builder.MapMethods("live", [HttpMethod.Get, HttpMethod.Head], Handler);
+			return;
+
+			Task Handler(HttpContext context) {
+				context.Response.StatusCode = _startup._ready
+					? context.Request.Query.TryGetValue("liveCode", out var expected) && int.TryParse(expected, out var statusCode)
+						? statusCode
+						: Livecode
+					: 503;
+
+				return Task.CompletedTask;
+			}
+		}
+	}
+
+	bool OAuthEnabled => _plugableComponents.Any(x => x is { Enabled: true, Name: "OAuthAuthentication" });
+}

@@ -1,0 +1,83 @@
+@page "/ui/stats"
+@attribute [Authorize(Policy = UiPolicies.ViewDatabaseStats)]
+@inherits KurrentDB.Components.Licensed.LicensedPage
+@using KurrentDB.Common.Configuration
+@using KurrentDB.Components.Plugins
+@using KurrentDB.Components.Shared
+@using KurrentDB.Components.Tools
+@using KurrentDB.SecondaryIndexing.Stats
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.DependencyInjection
+@using Serilog
+@inject IServiceProvider Services
+@inject PluginsService Plugins
+
+@if (!Plugins.IsPluginEnabled(PluginNames.SecondaryIndexes)) {
+	<NotEnabled Plugin="@PluginNames.SecondaryIndexes"/>
+	return;
+}
+
+<MudAlert Severity="Severity.Warning" Class="my-4">
+	These queries may impact performance on large databases.
+</MudAlert>
+
+<MudDivider/>
+<MudText Typo="Typo.h5" Class="pb-4 pt-2">Stream Categories</MudText>
+<MudPaper Outlined="true">
+	@if (_categoriesState is LoadState.ReadyToLoad) {
+		<MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadCategories">Load</MudButton>
+	} else if (_categoriesState is LoadState.Loading) {
+		<div class="d-flex justify-center align-center pa-6">
+			<MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large"/>
+			<MudText Class="ml-4 mt-2">Loading categories...</MudText>
+		</div>
+	} else if (_categoriesState is LoadState.FailedToLoad) {
+		<MudAlert Severity="Severity.Warning" Class="my-4">
+			Error: @(_exception?.Message)
+		</MudAlert>
+	} else {
+		<MudExpansionPanels MultiExpansion="true">
+			@foreach (var category in Elements) {
+				<CategoryStats CategoryName="@category.Category"/>
+			}
+		</MudExpansionPanels>
+	}
+</MudPaper>
+<MudDivider Class="mt-6"/>
+<MudText Typo="Typo.h5" Class="pt-2">Explicit Transactions (Obsolete)</MudText>
+<MudPaper Outlined="true" Class="mt-4">
+	<ExplicitTransactions/>
+</MudPaper>
+<MudDivider Class="mt-6"/>
+<MudText Typo="Typo.h5" Class="pt-2">Stream Stats</MudText>
+<MudPaper Outlined="true" Class="mt-4">
+	<LongestStreams/>
+</MudPaper>
+
+@code {
+	static readonly ILogger Log = Serilog.Log.ForContext<StatsPage>();
+
+	[CascadingParameter] Task<AuthenticationState> AuthenticationState { get; set; }
+
+	CategoryName[] Elements { get; set; } = [];
+	LoadState _categoriesState = LoadState.ReadyToLoad;
+	Exception _exception;
+
+	protected override string PageName => "Database Stats";
+
+	async Task LoadCategories() {
+		Log.Information("User requested database category stats load via UI");
+		_categoriesState = LoadState.Loading;
+		try {
+			var stats = Services.GetRequiredService<UiStatsService>();
+			var principal = (await AuthenticationState).User;
+			Elements = (await stats.GetCategoriesAsync(principal)).ToArray();
+			_categoriesState = LoadState.Loaded;
+		} catch (Exception ex) {
+			Log.Error(ex, "Error while loading database category stats via UI");
+			_exception = ex;
+			_categoriesState = LoadState.FailedToLoad;
+		}
+		StateHasChanged();
+	}
+}

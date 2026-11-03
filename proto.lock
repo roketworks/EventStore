@@ -41,6 +41,22 @@
             ]
           },
           {
+            "name": "OptionalBool",
+            "enum_fields": [
+              {
+                "name": "OPTIONAL_BOOL_UNSPECIFIED"
+              },
+              {
+                "name": "OPTIONAL_BOOL_FALSE",
+                "integer": 1
+              },
+              {
+                "name": "OPTIONAL_BOOL_TRUE",
+                "integer": 2
+              }
+            ]
+          },
+          {
             "name": "ReadEventCompleted.ReadEventResult",
             "enum_fields": [
               {
@@ -497,8 +513,116 @@
               },
               {
                 "id": 7,
-                "name": "current_version",
+                "name": "failure_current_version",
                 "type": "int64"
+              },
+              {
+                "id": 8,
+                "name": "failure_is_soft_deleted",
+                "type": "bool"
+              },
+              {
+                "id": 9,
+                "name": "failure_expected_version",
+                "type": "int64"
+              }
+            ],
+            "reserved_names": [
+              "current_version"
+            ]
+          },
+          {
+            "name": "WriteEventsMultiStream",
+            "fields": [
+              {
+                "id": 1,
+                "name": "event_stream_ids",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "expected_versions",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "events",
+                "type": "NewEvent",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "event_stream_indexes",
+                "type": "int32",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "require_leader",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "WriteEventsMultiStreamCompleted",
+            "fields": [
+              {
+                "id": 1,
+                "name": "result",
+                "type": "OperationResult"
+              },
+              {
+                "id": 2,
+                "name": "message",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "first_event_numbers",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "last_event_numbers",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "prepare_position",
+                "type": "int64"
+              },
+              {
+                "id": 6,
+                "name": "commit_position",
+                "type": "int64"
+              },
+              {
+                "id": 7,
+                "name": "failure_stream_indexes",
+                "type": "int32",
+                "is_repeated": true
+              },
+              {
+                "id": 8,
+                "name": "failure_current_versions",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 9,
+                "name": "failure_is_soft_deleted",
+                "type": "OptionalBool",
+                "is_repeated": true
+              },
+              {
+                "id": 10,
+                "name": "failure_expected_versions",
+                "type": "int64",
+                "is_repeated": true
               }
             ]
           },
@@ -548,6 +672,11 @@
               {
                 "id": 4,
                 "name": "commit_position",
+                "type": "int64"
+              },
+              {
+                "id": 5,
+                "name": "current_version",
                 "type": "int64"
               }
             ]
@@ -866,13 +995,7 @@
               {
                 "id": 6,
                 "name": "result",
-                "type": "ReadAllResult",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "Success"
-                  }
-                ]
+                "type": "ReadAllResult"
               },
               {
                 "id": 7,
@@ -979,13 +1102,7 @@
               {
                 "id": 7,
                 "name": "result",
-                "type": "FilteredReadAllResult",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "Success"
-                  }
-                ]
+                "type": "FilteredReadAllResult"
               },
               {
                 "id": 8,
@@ -1185,13 +1302,7 @@
               {
                 "id": 1,
                 "name": "result",
-                "type": "UpdatePersistentSubscriptionResult",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "Success"
-                  }
-                ]
+                "type": "UpdatePersistentSubscriptionResult"
               },
               {
                 "id": 2,
@@ -1206,13 +1317,7 @@
               {
                 "id": 1,
                 "name": "result",
-                "type": "CreatePersistentSubscriptionResult",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "Success"
-                  }
-                ]
+                "type": "CreatePersistentSubscriptionResult"
               },
               {
                 "id": 2,
@@ -1227,13 +1332,7 @@
               {
                 "id": 1,
                 "name": "result",
-                "type": "DeletePersistentSubscriptionResult",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "Success"
-                  }
-                ]
+                "type": "DeletePersistentSubscriptionResult"
               },
               {
                 "id": 2,
@@ -1300,13 +1399,7 @@
               {
                 "id": 4,
                 "name": "action",
-                "type": "NakAction",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "Unknown"
-                  }
-                ]
+                "type": "NakAction"
               }
             ]
           },
@@ -1434,13 +1527,7 @@
               {
                 "id": 1,
                 "name": "reason",
-                "type": "SubscriptionDropReason",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "Unsubscribed"
-                  }
-                ]
+                "type": "SubscriptionDropReason"
               }
             ]
           },
@@ -1633,7 +1720,7 @@
               {
                 "id": 1,
                 "name": "server_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1653,7 +1740,7 @@
               {
                 "id": 1,
                 "name": "server_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1673,7 +1760,7 @@
               {
                 "id": 1,
                 "name": "server_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1698,7 +1785,7 @@
               {
                 "id": 2,
                 "name": "server_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 3,
@@ -1718,12 +1805,12 @@
               {
                 "id": 6,
                 "name": "epoch_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 7,
                 "name": "epoch_leader_instance_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 8,
@@ -1758,7 +1845,7 @@
               {
                 "id": 1,
                 "name": "server_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1768,7 +1855,7 @@
               {
                 "id": 3,
                 "name": "leader_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 4,
@@ -1793,12 +1880,12 @@
               {
                 "id": 8,
                 "name": "epoch_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 9,
                 "name": "epoch_leader_instance_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 10,
@@ -1828,7 +1915,7 @@
               {
                 "id": 1,
                 "name": "server_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1838,7 +1925,7 @@
               {
                 "id": 3,
                 "name": "leader_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 4,
@@ -1858,7 +1945,7 @@
               {
                 "id": 1,
                 "name": "leader_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1873,7 +1960,7 @@
               {
                 "id": 1,
                 "name": "leader_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1883,7 +1970,7 @@
               {
                 "id": 3,
                 "name": "server_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 4,
@@ -1924,7 +2011,7 @@
               {
                 "id": 1,
                 "name": "instance_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -1994,7 +2081,7 @@
               {
                 "id": 15,
                 "name": "epoch_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 16,
@@ -2020,6 +2107,322 @@
                 "id": 20,
                 "name": "advertise_tcp_port_to_client_as",
                 "type": "uint32"
+              },
+              {
+                "id": 21,
+                "name": "es_version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ReplicaLogWrite",
+            "fields": [
+              {
+                "id": 1,
+                "name": "log_position",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "replica_id",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "ReplicatedTo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "log_position",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "Epoch",
+            "fields": [
+              {
+                "id": 1,
+                "name": "epoch_position",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "epoch_number",
+                "type": "int32"
+              },
+              {
+                "id": 3,
+                "name": "epoch_id",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "SubscribeReplica",
+            "fields": [
+              {
+                "id": 1,
+                "name": "log_position",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "chunk_id",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "LastEpochs",
+                "type": "Epoch",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "ip",
+                "type": "bytes"
+              },
+              {
+                "id": 5,
+                "name": "port",
+                "type": "int32"
+              },
+              {
+                "id": 6,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "subscription_id",
+                "type": "bytes"
+              },
+              {
+                "id": 8,
+                "name": "is_promotable",
+                "type": "bool"
+              },
+              {
+                "id": 9,
+                "name": "version",
+                "type": "int32"
+              }
+            ]
+          },
+          {
+            "name": "ReplicaSubscriptionRetry",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "ReplicaSubscribed",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "subscription_position",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "ReplicaLogPositionAck",
+            "fields": [
+              {
+                "id": 1,
+                "name": "subscription_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "replication_log_position",
+                "type": "int64"
+              },
+              {
+                "id": 3,
+                "name": "writer_log_position",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "CreateChunk",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "chunk_header_bytes",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "file_size",
+                "type": "int32"
+              },
+              {
+                "id": 5,
+                "name": "is_scavenged_chunk",
+                "type": "bool"
+              },
+              {
+                "id": 6,
+                "name": "transform_header_bytes",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "RawChunkBulk",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "chunk_start_number",
+                "type": "int32"
+              },
+              {
+                "id": 4,
+                "name": "chunk_end_number",
+                "type": "int32"
+              },
+              {
+                "id": 5,
+                "name": "raw_position",
+                "type": "int32"
+              },
+              {
+                "id": 6,
+                "name": "raw_bytes",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "complete_chunk",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "DataChunkBulk",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "chunk_start_number",
+                "type": "int32"
+              },
+              {
+                "id": 4,
+                "name": "chunk_end_number",
+                "type": "int32"
+              },
+              {
+                "id": 5,
+                "name": "subscription_position",
+                "type": "int64"
+              },
+              {
+                "id": 6,
+                "name": "data_bytes",
+                "type": "bytes"
+              },
+              {
+                "id": 7,
+                "name": "complete_chunk",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "FollowerAssignment",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "CloneAssignment",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "DropSubscription",
+            "fields": [
+              {
+                "id": 1,
+                "name": "leader_id",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "subscription_id",
+                "type": "bytes"
               }
             ]
           }
@@ -2035,7 +2438,7 @@
               },
               {
                 "name": "Read",
-                "in_type": "event_store.client.shared.Empty",
+                "in_type": "event_store.client.Empty",
                 "out_type": "ClusterInfo"
               }
             ]
@@ -2046,42 +2449,42 @@
               {
                 "name": "ViewChange",
                 "in_type": "ViewChangeRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "ViewChangeProof",
                 "in_type": "ViewChangeProofRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "Prepare",
                 "in_type": "PrepareRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "PrepareOk",
                 "in_type": "PrepareOkRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "Proposal",
                 "in_type": "ProposalRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "Accept",
                 "in_type": "AcceptRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "LeaderIsResigning",
                 "in_type": "LeaderIsResigningRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "LeaderIsResigningOk",
                 "in_type": "LeaderIsResigningOkRequest",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               }
             ]
           }
@@ -2098,6 +2501,110 @@
           {
             "name": "java_package",
             "value": "com.eventstore.dbclient.proto.cluster"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "Grpc:/:code.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Code",
+            "enum_fields": [
+              {
+                "name": "OK"
+              },
+              {
+                "name": "CANCELLED",
+                "integer": 1
+              },
+              {
+                "name": "UNKNOWN",
+                "integer": 2
+              },
+              {
+                "name": "INVALID_ARGUMENT",
+                "integer": 3
+              },
+              {
+                "name": "DEADLINE_EXCEEDED",
+                "integer": 4
+              },
+              {
+                "name": "NOT_FOUND",
+                "integer": 5
+              },
+              {
+                "name": "ALREADY_EXISTS",
+                "integer": 6
+              },
+              {
+                "name": "PERMISSION_DENIED",
+                "integer": 7
+              },
+              {
+                "name": "UNAUTHENTICATED",
+                "integer": 16
+              },
+              {
+                "name": "RESOURCE_EXHAUSTED",
+                "integer": 8
+              },
+              {
+                "name": "FAILED_PRECONDITION",
+                "integer": 9
+              },
+              {
+                "name": "ABORTED",
+                "integer": 10
+              },
+              {
+                "name": "OUT_OF_RANGE",
+                "integer": 11
+              },
+              {
+                "name": "UNIMPLEMENTED",
+                "integer": 12
+              },
+              {
+                "name": "INTERNAL",
+                "integer": 13
+              },
+              {
+                "name": "UNAVAILABLE",
+                "integer": 14
+              },
+              {
+                "name": "DATA_LOSS",
+                "integer": 15
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "google.rpc"
+        },
+        "options": [
+          {
+            "name": "go_package",
+            "value": "google.golang.org/genproto/googleapis/rpc/code;code"
+          },
+          {
+            "name": "java_multiple_files",
+            "value": "true"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "CodeProto"
+          },
+          {
+            "name": "java_package",
+            "value": "com.google.rpc"
+          },
+          {
+            "name": "objc_class_prefix",
+            "value": "RPC"
           }
         ]
       }
@@ -2208,7 +2715,7 @@
               {
                 "id": 1,
                 "name": "instance_id",
-                "type": "event_store.client.shared.UUID"
+                "type": "event_store.client.UUID"
               },
               {
                 "id": 2,
@@ -2239,7 +2746,7 @@
             "rpcs": [
               {
                 "name": "Read",
-                "in_type": "event_store.client.shared.Empty",
+                "in_type": "event_store.client.Empty",
                 "out_type": "ClusterInfo"
               }
             ]
@@ -2257,6 +2764,63 @@
           {
             "name": "java_package",
             "value": "com.eventstore.dbclient.proto.gossip"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "Grpc:/:monitoring.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "StatsReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "use_metadata",
+                "type": "bool"
+              },
+              {
+                "id": 4,
+                "name": "refresh_time_period_in_ms",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "StatsResp",
+            "maps": [
+              {
+                "key_type": "string",
+                "field": {
+                  "id": 1,
+                  "name": "stats",
+                  "type": "string"
+                }
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "Monitoring",
+            "rpcs": [
+              {
+                "name": "Stats",
+                "in_type": "StatsReq",
+                "out_type": "StatsResp",
+                "out_streamed": true
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "event_store.client.monitoring"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "com.eventstore.dbclient.proto.monitoring"
           }
         ]
       }
@@ -2374,28 +2938,28 @@
               },
               {
                 "name": "Shutdown",
-                "in_type": "event_store.client.shared.Empty",
-                "out_type": "event_store.client.shared.Empty"
+                "in_type": "event_store.client.Empty",
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "MergeIndexes",
-                "in_type": "event_store.client.shared.Empty",
-                "out_type": "event_store.client.shared.Empty"
+                "in_type": "event_store.client.Empty",
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "ResignNode",
-                "in_type": "event_store.client.shared.Empty",
-                "out_type": "event_store.client.shared.Empty"
+                "in_type": "event_store.client.Empty",
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "SetNodePriority",
                 "in_type": "SetNodePriorityReq",
-                "out_type": "event_store.client.shared.Empty"
+                "out_type": "event_store.client.Empty"
               },
               {
                 "name": "RestartPersistentSubscriptions",
-                "in_type": "event_store.client.shared.Empty",
-                "out_type": "event_store.client.shared.Empty"
+                "in_type": "event_store.client.Empty",
+                "out_type": "event_store.client.Empty"
               }
             ]
           }
@@ -2504,7 +3068,12 @@
                   {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 5,
+                    "name": "all",
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 2,
@@ -2529,12 +3098,12 @@
                       {
                         "id": 1,
                         "name": "structured",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       },
                       {
                         "id": 2,
                         "name": "string",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       }
                     ]
                   }
@@ -2551,7 +3120,7 @@
                   {
                     "id": 2,
                     "name": "ids",
-                    "type": "event_store.client.shared.UUID",
+                    "type": "event_store.client.UUID",
                     "is_repeated": true
                   }
                 ]
@@ -2567,7 +3136,7 @@
                   {
                     "id": 2,
                     "name": "ids",
-                    "type": "event_store.client.shared.UUID",
+                    "type": "event_store.client.UUID",
                     "is_repeated": true
                   },
                   {
@@ -2620,7 +3189,7 @@
                   {
                     "id": 4,
                     "name": "no_position",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 5,
@@ -2630,7 +3199,7 @@
                   {
                     "id": 6,
                     "name": "no_retry_count",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   }
                 ],
                 "messages": [
@@ -2640,12 +3209,12 @@
                       {
                         "id": 1,
                         "name": "id",
-                        "type": "event_store.client.shared.UUID"
+                        "type": "event_store.client.UUID"
                       },
                       {
                         "id": 2,
                         "name": "stream_identifier",
-                        "type": "event_store.client.shared.StreamIdentifier"
+                        "type": "event_store.client.StreamIdentifier"
                       },
                       {
                         "id": 3,
@@ -2712,9 +3281,25 @@
                 "name": "Options",
                 "fields": [
                   {
+                    "id": 4,
+                    "name": "stream",
+                    "type": "StreamOptions"
+                  },
+                  {
+                    "id": 5,
+                    "name": "all",
+                    "type": "AllOptions"
+                  },
+                  {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier",
+                    "options": [
+                      {
+                        "name": "deprecated",
+                        "value": "true"
+                      }
+                    ]
                   },
                   {
                     "id": 2,
@@ -2729,6 +3314,126 @@
                 ]
               },
               {
+                "name": "StreamOptions",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "stream_identifier",
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 2,
+                    "name": "revision",
+                    "type": "uint64"
+                  },
+                  {
+                    "id": 3,
+                    "name": "start",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 4,
+                    "name": "end",
+                    "type": "event_store.client.Empty"
+                  }
+                ]
+              },
+              {
+                "name": "AllOptions",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "position",
+                    "type": "Position"
+                  },
+                  {
+                    "id": 2,
+                    "name": "start",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 3,
+                    "name": "end",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 4,
+                    "name": "filter",
+                    "type": "FilterOptions"
+                  },
+                  {
+                    "id": 5,
+                    "name": "no_filter",
+                    "type": "event_store.client.Empty"
+                  }
+                ],
+                "messages": [
+                  {
+                    "name": "FilterOptions",
+                    "fields": [
+                      {
+                        "id": 1,
+                        "name": "stream_identifier",
+                        "type": "Expression"
+                      },
+                      {
+                        "id": 2,
+                        "name": "event_type",
+                        "type": "Expression"
+                      },
+                      {
+                        "id": 3,
+                        "name": "max",
+                        "type": "uint32"
+                      },
+                      {
+                        "id": 4,
+                        "name": "count",
+                        "type": "event_store.client.Empty"
+                      },
+                      {
+                        "id": 5,
+                        "name": "checkpointIntervalMultiplier",
+                        "type": "uint32"
+                      }
+                    ],
+                    "messages": [
+                      {
+                        "name": "Expression",
+                        "fields": [
+                          {
+                            "id": 1,
+                            "name": "regex",
+                            "type": "string"
+                          },
+                          {
+                            "id": 2,
+                            "name": "prefix",
+                            "type": "string",
+                            "is_repeated": true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Position",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "commit_position",
+                    "type": "uint64"
+                  },
+                  {
+                    "id": 2,
+                    "name": "prepare_position",
+                    "type": "uint64"
+                  }
+                ]
+              },
+              {
                 "name": "Settings",
                 "fields": [
                   {
@@ -2739,7 +3444,13 @@
                   {
                     "id": 2,
                     "name": "revision",
-                    "type": "uint64"
+                    "type": "uint64",
+                    "options": [
+                      {
+                        "name": "deprecated",
+                        "value": "true"
+                      }
+                    ]
                   },
                   {
                     "id": 3,
@@ -2784,7 +3495,13 @@
                   {
                     "id": 13,
                     "name": "named_consumer_strategy",
-                    "type": "ConsumerStrategy"
+                    "type": "ConsumerStrategy",
+                    "options": [
+                      {
+                        "name": "deprecated",
+                        "value": "true"
+                      }
+                    ]
                   },
                   {
                     "id": 4,
@@ -2805,6 +3522,11 @@
                     "id": 15,
                     "name": "checkpoint_after_ms",
                     "type": "int32"
+                  },
+                  {
+                    "id": 16,
+                    "name": "consumer_strategy",
+                    "type": "string"
                   }
                 ]
               }
@@ -2827,9 +3549,25 @@
                 "name": "Options",
                 "fields": [
                   {
+                    "id": 4,
+                    "name": "stream",
+                    "type": "StreamOptions"
+                  },
+                  {
+                    "id": 5,
+                    "name": "all",
+                    "type": "AllOptions"
+                  },
+                  {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier",
+                    "options": [
+                      {
+                        "name": "deprecated",
+                        "value": "true"
+                      }
+                    ]
                   },
                   {
                     "id": 2,
@@ -2844,6 +3582,66 @@
                 ]
               },
               {
+                "name": "StreamOptions",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "stream_identifier",
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 2,
+                    "name": "revision",
+                    "type": "uint64"
+                  },
+                  {
+                    "id": 3,
+                    "name": "start",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 4,
+                    "name": "end",
+                    "type": "event_store.client.Empty"
+                  }
+                ]
+              },
+              {
+                "name": "AllOptions",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "position",
+                    "type": "Position"
+                  },
+                  {
+                    "id": 2,
+                    "name": "start",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 3,
+                    "name": "end",
+                    "type": "event_store.client.Empty"
+                  }
+                ]
+              },
+              {
+                "name": "Position",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "commit_position",
+                    "type": "uint64"
+                  },
+                  {
+                    "id": 2,
+                    "name": "prepare_position",
+                    "type": "uint64"
+                  }
+                ]
+              },
+              {
                 "name": "Settings",
                 "fields": [
                   {
@@ -2854,7 +3652,13 @@
                   {
                     "id": 2,
                     "name": "revision",
-                    "type": "uint64"
+                    "type": "uint64",
+                    "options": [
+                      {
+                        "name": "deprecated",
+                        "value": "true"
+                      }
+                    ]
                   },
                   {
                     "id": 3,
@@ -2944,7 +3748,12 @@
                   {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 3,
+                    "name": "all",
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 2,
@@ -2957,6 +3766,405 @@
           },
           {
             "name": "DeleteResp"
+          },
+          {
+            "name": "GetInfoReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "options",
+                "type": "Options"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Options",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "stream_identifier",
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 2,
+                    "name": "all",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 3,
+                    "name": "group_name",
+                    "type": "string"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "GetInfoResp",
+            "fields": [
+              {
+                "id": 1,
+                "name": "subscription_info",
+                "type": "SubscriptionInfo"
+              }
+            ]
+          },
+          {
+            "name": "SubscriptionInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "event_source",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "group_name",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "status",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "connections",
+                "type": "ConnectionInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "average_per_second",
+                "type": "int32"
+              },
+              {
+                "id": 6,
+                "name": "total_items",
+                "type": "int64"
+              },
+              {
+                "id": 7,
+                "name": "count_since_last_measurement",
+                "type": "int64"
+              },
+              {
+                "id": 8,
+                "name": "last_checkpointed_event_position",
+                "type": "string"
+              },
+              {
+                "id": 9,
+                "name": "last_known_event_position",
+                "type": "string"
+              },
+              {
+                "id": 10,
+                "name": "resolve_link_tos",
+                "type": "bool"
+              },
+              {
+                "id": 11,
+                "name": "start_from",
+                "type": "string"
+              },
+              {
+                "id": 12,
+                "name": "message_timeout_milliseconds",
+                "type": "int32"
+              },
+              {
+                "id": 13,
+                "name": "extra_statistics",
+                "type": "bool"
+              },
+              {
+                "id": 14,
+                "name": "max_retry_count",
+                "type": "int32"
+              },
+              {
+                "id": 15,
+                "name": "live_buffer_size",
+                "type": "int32"
+              },
+              {
+                "id": 16,
+                "name": "buffer_size",
+                "type": "int32"
+              },
+              {
+                "id": 17,
+                "name": "read_batch_size",
+                "type": "int32"
+              },
+              {
+                "id": 18,
+                "name": "check_point_after_milliseconds",
+                "type": "int32"
+              },
+              {
+                "id": 19,
+                "name": "min_check_point_count",
+                "type": "int32"
+              },
+              {
+                "id": 20,
+                "name": "max_check_point_count",
+                "type": "int32"
+              },
+              {
+                "id": 21,
+                "name": "read_buffer_count",
+                "type": "int32"
+              },
+              {
+                "id": 22,
+                "name": "live_buffer_count",
+                "type": "int64"
+              },
+              {
+                "id": 23,
+                "name": "retry_buffer_count",
+                "type": "int32"
+              },
+              {
+                "id": 24,
+                "name": "total_in_flight_messages",
+                "type": "int32"
+              },
+              {
+                "id": 25,
+                "name": "outstanding_messages_count",
+                "type": "int32"
+              },
+              {
+                "id": 26,
+                "name": "named_consumer_strategy",
+                "type": "string"
+              },
+              {
+                "id": 27,
+                "name": "max_subscriber_count",
+                "type": "int32"
+              },
+              {
+                "id": 28,
+                "name": "parked_message_count",
+                "type": "int64"
+              }
+            ],
+            "messages": [
+              {
+                "name": "ConnectionInfo",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "from",
+                    "type": "string"
+                  },
+                  {
+                    "id": 2,
+                    "name": "username",
+                    "type": "string"
+                  },
+                  {
+                    "id": 3,
+                    "name": "average_items_per_second",
+                    "type": "int32"
+                  },
+                  {
+                    "id": 4,
+                    "name": "total_items",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 5,
+                    "name": "count_since_last_measurement",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 6,
+                    "name": "observed_measurements",
+                    "type": "Measurement",
+                    "is_repeated": true
+                  },
+                  {
+                    "id": 7,
+                    "name": "available_slots",
+                    "type": "int32"
+                  },
+                  {
+                    "id": 8,
+                    "name": "in_flight_messages",
+                    "type": "int32"
+                  },
+                  {
+                    "id": 9,
+                    "name": "connection_name",
+                    "type": "string"
+                  }
+                ]
+              },
+              {
+                "name": "Measurement",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "key",
+                    "type": "string"
+                  },
+                  {
+                    "id": 2,
+                    "name": "value",
+                    "type": "int64"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ReplayParkedReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "options",
+                "type": "Options"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Options",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "group_name",
+                    "type": "string"
+                  },
+                  {
+                    "id": 2,
+                    "name": "stream_identifier",
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 3,
+                    "name": "all",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 4,
+                    "name": "stop_at",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 5,
+                    "name": "no_limit",
+                    "type": "event_store.client.Empty"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ReplayParkedResp"
+          },
+          {
+            "name": "TruncateParkedReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "options",
+                "type": "Options"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Options",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "group_name",
+                    "type": "string"
+                  },
+                  {
+                    "id": 2,
+                    "name": "stream_identifier",
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 3,
+                    "name": "all",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 4,
+                    "name": "stop_at",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 5,
+                    "name": "no_limit",
+                    "type": "event_store.client.Empty"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "TruncateParkedResp"
+          },
+          {
+            "name": "ListReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "options",
+                "type": "Options"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Options",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "list_all_subscriptions",
+                    "type": "event_store.client.Empty"
+                  },
+                  {
+                    "id": 2,
+                    "name": "list_for_stream",
+                    "type": "StreamOption"
+                  }
+                ]
+              },
+              {
+                "name": "StreamOption",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "stream",
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 2,
+                    "name": "all",
+                    "type": "event_store.client.Empty"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ListResp",
+            "fields": [
+              {
+                "id": 1,
+                "name": "subscriptions",
+                "type": "SubscriptionInfo",
+                "is_repeated": true
+              }
+            ]
           }
         ],
         "services": [
@@ -2984,6 +4192,31 @@
                 "out_type": "ReadResp",
                 "in_streamed": true,
                 "out_streamed": true
+              },
+              {
+                "name": "GetInfo",
+                "in_type": "GetInfoReq",
+                "out_type": "GetInfoResp"
+              },
+              {
+                "name": "ReplayParked",
+                "in_type": "ReplayParkedReq",
+                "out_type": "ReplayParkedResp"
+              },
+              {
+                "name": "TruncateParked",
+                "in_type": "TruncateParkedReq",
+                "out_type": "TruncateParkedResp"
+              },
+              {
+                "name": "List",
+                "in_type": "ListReq",
+                "out_type": "ListResp"
+              },
+              {
+                "name": "RestartSubsystem",
+                "in_type": "event_store.client.Empty",
+                "out_type": "event_store.client.Empty"
               }
             ]
           }
@@ -3024,7 +4257,7 @@
                   {
                     "id": 1,
                     "name": "one_time",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 2,
@@ -3040,6 +4273,21 @@
                     "id": 4,
                     "name": "query",
                     "type": "string"
+                  },
+                  {
+                    "id": 5,
+                    "name": "engine_version",
+                    "type": "int32"
+                  }
+                ],
+                "maps": [
+                  {
+                    "key_type": "string",
+                    "field": {
+                      "id": 6,
+                      "name": "properties",
+                      "type": "google.protobuf.Value"
+                    }
                   }
                 ],
                 "messages": [
@@ -3063,6 +4311,11 @@
                       },
                       {
                         "id": 2,
+                        "name": "emit_enabled",
+                        "type": "bool"
+                      },
+                      {
+                        "id": 3,
                         "name": "track_emitted_streams",
                         "type": "bool"
                       }
@@ -3106,7 +4359,17 @@
                   {
                     "id": 4,
                     "name": "no_emit_options",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
+                  }
+                ],
+                "maps": [
+                  {
+                    "key_type": "string",
+                    "field": {
+                      "id": 5,
+                      "name": "properties",
+                      "type": "google.protobuf.Value"
+                    }
                   }
                 ]
               }
@@ -3176,22 +4439,22 @@
                   {
                     "id": 2,
                     "name": "all",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 3,
                     "name": "transient",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 4,
                     "name": "continuous",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 5,
                     "name": "one_time",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   }
                 ]
               }
@@ -3521,8 +4784,8 @@
               },
               {
                 "name": "RestartSubsystem",
-                "in_type": "event_store.client.shared.Empty",
-                "out_type": "event_store.client.shared.Empty"
+                "in_type": "event_store.client.Empty",
+                "out_type": "event_store.client.Empty"
               }
             ]
           }
@@ -3542,6 +4805,202 @@
           {
             "name": "java_package",
             "value": "com.eventstore.dbclient.proto.projections"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "Grpc:/:redaction.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "GetEventPositionReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "stream_identifier",
+                "type": "event_store.client.StreamIdentifier"
+              },
+              {
+                "id": 2,
+                "name": "stream_revision",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "GetEventPositionResp",
+            "fields": [
+              {
+                "id": 1,
+                "name": "event_positions",
+                "type": "EventPosition",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "EventPosition",
+            "fields": [
+              {
+                "id": 1,
+                "name": "log_position",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "chunk_info",
+                "type": "ChunkInfo"
+              }
+            ]
+          },
+          {
+            "name": "ChunkInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "file_name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "version",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "is_complete",
+                "type": "bool"
+              },
+              {
+                "id": 4,
+                "name": "event_offset",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "SwitchChunkReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "target_chunk_file",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "new_chunk_file",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SwitchChunkResp"
+          }
+        ],
+        "services": [
+          {
+            "name": "Redaction",
+            "rpcs": [
+              {
+                "name": "GetEventPositions",
+                "in_type": "GetEventPositionReq",
+                "out_type": "GetEventPositionResp",
+                "in_streamed": true,
+                "out_streamed": true
+              },
+              {
+                "name": "SwitchChunks",
+                "in_type": "SwitchChunkReq",
+                "out_type": "SwitchChunkResp",
+                "in_streamed": true,
+                "out_streamed": true
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "shared.proto"
+          }
+        ],
+        "package": {
+          "name": "kurrent.client.redaction"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "com.kurrent.dbclient.proto.redaction"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "Grpc:/:serverfeatures.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "SupportedMethods",
+            "fields": [
+              {
+                "id": 1,
+                "name": "methods",
+                "type": "SupportedMethod",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "event_store_server_version",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SupportedMethod",
+            "fields": [
+              {
+                "id": 1,
+                "name": "method_name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "service_name",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "features",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "ServerFeatures",
+            "rpcs": [
+              {
+                "name": "GetSupportedMethods",
+                "in_type": "event_store.client.Empty",
+                "out_type": "SupportedMethods"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "shared.proto"
+          }
+        ],
+        "package": {
+          "name": "event_store.client.server_features"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "com.eventstore.dbclient.proto.serverfeatures"
           }
         ]
       }
@@ -3590,7 +5049,7 @@
             "fields": [
               {
                 "id": 3,
-                "name": "streamName",
+                "name": "stream_name",
                 "type": "bytes"
               }
             ],
@@ -3598,15 +5057,196 @@
               1,
               2
             ]
+          },
+          {
+            "name": "AllStreamPosition",
+            "fields": [
+              {
+                "id": 1,
+                "name": "commit_position",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "prepare_position",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "WrongExpectedVersion",
+            "fields": [
+              {
+                "id": 1,
+                "name": "current_stream_revision",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "current_no_stream",
+                "type": "google.protobuf.Empty"
+              },
+              {
+                "id": 3,
+                "name": "expected_stream_position",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "expected_any",
+                "type": "google.protobuf.Empty"
+              },
+              {
+                "id": 5,
+                "name": "expected_stream_exists",
+                "type": "google.protobuf.Empty"
+              },
+              {
+                "id": 6,
+                "name": "expected_no_stream",
+                "type": "google.protobuf.Empty"
+              }
+            ]
+          },
+          {
+            "name": "AccessDenied"
+          },
+          {
+            "name": "StreamDeleted",
+            "fields": [
+              {
+                "id": 1,
+                "name": "stream_identifier",
+                "type": "StreamIdentifier"
+              }
+            ]
+          },
+          {
+            "name": "Timeout"
+          },
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "InvalidTransaction"
+          },
+          {
+            "name": "MaximumAppendSizeExceeded",
+            "fields": [
+              {
+                "id": 1,
+                "name": "maxAppendSize",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "MaximumAppendEventSizeExceeded",
+            "fields": [
+              {
+                "id": 1,
+                "name": "eventId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "proposedEventSize",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "maxAppendEventSize",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "BadRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "message",
+                "type": "string"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "google/protobuf/empty.proto"
           }
         ],
         "package": {
-          "name": "event_store.client.shared"
+          "name": "event_store.client"
         },
         "options": [
           {
             "name": "java_package",
             "value": "com.eventstore.dbclient.proto.shared"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "Grpc:/:status.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "Status",
+            "fields": [
+              {
+                "id": 1,
+                "name": "code",
+                "type": "google.rpc.Code"
+              },
+              {
+                "id": 2,
+                "name": "message",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "details",
+                "type": "google.protobuf.Any"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "google/protobuf/any.proto"
+          },
+          {
+            "path": "code.proto"
+          }
+        ],
+        "package": {
+          "name": "google.rpc"
+        },
+        "options": [
+          {
+            "name": "cc_enable_arenas",
+            "value": "true"
+          },
+          {
+            "name": "go_package",
+            "value": "google.golang.org/genproto/googleapis/rpc/status;status"
+          },
+          {
+            "name": "java_multiple_files",
+            "value": "true"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "StatusProto"
+          },
+          {
+            "name": "java_package",
+            "value": "com.google.rpc"
+          },
+          {
+            "name": "objc_class_prefix",
+            "value": "RPC"
           }
         ]
       }
@@ -3680,12 +5320,17 @@
                   {
                     "id": 8,
                     "name": "no_filter",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 9,
                     "name": "uuid_option",
                     "type": "UUIDOption"
+                  },
+                  {
+                    "id": 10,
+                    "name": "control_option",
+                    "type": "ControlOption"
                   }
                 ],
                 "messages": [
@@ -3695,7 +5340,7 @@
                       {
                         "id": 1,
                         "name": "stream_identifier",
-                        "type": "event_store.client.shared.StreamIdentifier"
+                        "type": "event_store.client.StreamIdentifier"
                       },
                       {
                         "id": 2,
@@ -3705,12 +5350,12 @@
                       {
                         "id": 3,
                         "name": "start",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       },
                       {
                         "id": 4,
                         "name": "end",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       }
                     ]
                   },
@@ -3725,12 +5370,12 @@
                       {
                         "id": 2,
                         "name": "start",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       },
                       {
                         "id": 3,
                         "name": "end",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       }
                     ]
                   },
@@ -3773,7 +5418,7 @@
                       {
                         "id": 4,
                         "name": "count",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       },
                       {
                         "id": 5,
@@ -3806,12 +5451,22 @@
                       {
                         "id": 1,
                         "name": "structured",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
                       },
                       {
                         "id": 2,
                         "name": "string",
-                        "type": "event_store.client.shared.Empty"
+                        "type": "event_store.client.Empty"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "ControlOption",
+                    "fields": [
+                      {
+                        "id": 1,
+                        "name": "compatibility",
+                        "type": "uint32"
                       }
                     ]
                   }
@@ -3841,9 +5496,74 @@
                 "id": 4,
                 "name": "stream_not_found",
                 "type": "StreamNotFound"
+              },
+              {
+                "id": 5,
+                "name": "first_stream_position",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "last_stream_position",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "last_all_stream_position",
+                "type": "AllStreamPosition"
+              },
+              {
+                "id": 8,
+                "name": "caught_up",
+                "type": "CaughtUp"
+              },
+              {
+                "id": 9,
+                "name": "fell_behind",
+                "type": "FellBehind"
               }
             ],
             "messages": [
+              {
+                "name": "CaughtUp",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "timestamp",
+                    "type": "google.protobuf.Timestamp"
+                  },
+                  {
+                    "id": 2,
+                    "name": "stream_revision",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 3,
+                    "name": "position",
+                    "type": "Position"
+                  }
+                ]
+              },
+              {
+                "name": "FellBehind",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "timestamp",
+                    "type": "google.protobuf.Timestamp"
+                  },
+                  {
+                    "id": 2,
+                    "name": "stream_revision",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 3,
+                    "name": "position",
+                    "type": "Position"
+                  }
+                ]
+              },
               {
                 "name": "ReadEvent",
                 "fields": [
@@ -3865,7 +5585,7 @@
                   {
                     "id": 4,
                     "name": "no_position",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   }
                 ],
                 "messages": [
@@ -3875,12 +5595,12 @@
                       {
                         "id": 1,
                         "name": "id",
-                        "type": "event_store.client.shared.UUID"
+                        "type": "event_store.client.UUID"
                       },
                       {
                         "id": 2,
                         "name": "stream_identifier",
-                        "type": "event_store.client.shared.StreamIdentifier"
+                        "type": "event_store.client.StreamIdentifier"
                       },
                       {
                         "id": 3,
@@ -3943,6 +5663,26 @@
                     "id": 2,
                     "name": "prepare_position",
                     "type": "uint64"
+                  },
+                  {
+                    "id": 3,
+                    "name": "timestamp",
+                    "type": "google.protobuf.Timestamp"
+                  }
+                ]
+              },
+              {
+                "name": "Position",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "commit_position",
+                    "type": "uint64"
+                  },
+                  {
+                    "id": 2,
+                    "name": "prepare_position",
+                    "type": "uint64"
                   }
                 ]
               },
@@ -3952,7 +5692,7 @@
                   {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier"
                   }
                 ]
               }
@@ -3979,7 +5719,7 @@
                   {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier"
                   },
                   {
                     "id": 2,
@@ -3989,17 +5729,17 @@
                   {
                     "id": 3,
                     "name": "no_stream",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 4,
                     "name": "any",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 5,
                     "name": "stream_exists",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   }
                 ]
               },
@@ -4009,7 +5749,7 @@
                   {
                     "id": 1,
                     "name": "id",
-                    "type": "event_store.client.shared.UUID"
+                    "type": "event_store.client.UUID"
                   },
                   {
                     "id": 3,
@@ -4076,7 +5816,7 @@
                   {
                     "id": 2,
                     "name": "no_stream",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 3,
@@ -4086,7 +5826,7 @@
                   {
                     "id": 4,
                     "name": "no_position",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   }
                 ]
               },
@@ -4101,7 +5841,7 @@
                   {
                     "id": 2,
                     "name": "no_stream_20_6_0",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 3,
@@ -4111,12 +5851,12 @@
                   {
                     "id": 4,
                     "name": "any_20_6_0",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 5,
                     "name": "stream_exists_20_6_0",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 6,
@@ -4126,7 +5866,7 @@
                   {
                     "id": 7,
                     "name": "current_no_stream",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 8,
@@ -4136,17 +5876,187 @@
                   {
                     "id": 9,
                     "name": "expected_any",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 10,
                     "name": "expected_stream_exists",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 11,
                     "name": "expected_no_stream",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "BatchAppendReq",
+            "fields": [
+              {
+                "id": 1,
+                "name": "correlation_id",
+                "type": "event_store.client.UUID"
+              },
+              {
+                "id": 2,
+                "name": "options",
+                "type": "Options"
+              },
+              {
+                "id": 3,
+                "name": "proposed_messages",
+                "type": "ProposedMessage",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "is_final",
+                "type": "bool"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Options",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "stream_identifier",
+                    "type": "event_store.client.StreamIdentifier"
+                  },
+                  {
+                    "id": 2,
+                    "name": "stream_position",
+                    "type": "uint64"
+                  },
+                  {
+                    "id": 3,
+                    "name": "no_stream",
+                    "type": "google.protobuf.Empty"
+                  },
+                  {
+                    "id": 4,
+                    "name": "any",
+                    "type": "google.protobuf.Empty"
+                  },
+                  {
+                    "id": 5,
+                    "name": "stream_exists",
+                    "type": "google.protobuf.Empty"
+                  },
+                  {
+                    "id": 6,
+                    "name": "deadline_21_10_0",
+                    "type": "google.protobuf.Timestamp"
+                  },
+                  {
+                    "id": 7,
+                    "name": "deadline",
+                    "type": "google.protobuf.Duration"
+                  }
+                ]
+              },
+              {
+                "name": "ProposedMessage",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "id",
+                    "type": "event_store.client.UUID"
+                  },
+                  {
+                    "id": 3,
+                    "name": "custom_metadata",
+                    "type": "bytes"
+                  },
+                  {
+                    "id": 4,
+                    "name": "data",
+                    "type": "bytes"
+                  }
+                ],
+                "maps": [
+                  {
+                    "key_type": "string",
+                    "field": {
+                      "id": 2,
+                      "name": "metadata",
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "BatchAppendResp",
+            "fields": [
+              {
+                "id": 1,
+                "name": "correlation_id",
+                "type": "event_store.client.UUID"
+              },
+              {
+                "id": 2,
+                "name": "error",
+                "type": "google.rpc.Status"
+              },
+              {
+                "id": 3,
+                "name": "success",
+                "type": "Success"
+              },
+              {
+                "id": 4,
+                "name": "stream_identifier",
+                "type": "event_store.client.StreamIdentifier"
+              },
+              {
+                "id": 5,
+                "name": "stream_position",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "no_stream",
+                "type": "google.protobuf.Empty"
+              },
+              {
+                "id": 7,
+                "name": "any",
+                "type": "google.protobuf.Empty"
+              },
+              {
+                "id": 8,
+                "name": "stream_exists",
+                "type": "google.protobuf.Empty"
+              }
+            ],
+            "messages": [
+              {
+                "name": "Success",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "current_revision",
+                    "type": "uint64"
+                  },
+                  {
+                    "id": 2,
+                    "name": "no_stream",
+                    "type": "google.protobuf.Empty"
+                  },
+                  {
+                    "id": 3,
+                    "name": "position",
+                    "type": "event_store.client.AllStreamPosition"
+                  },
+                  {
+                    "id": 4,
+                    "name": "no_position",
+                    "type": "google.protobuf.Empty"
                   }
                 ]
               }
@@ -4168,7 +6078,7 @@
                   {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier"
                   },
                   {
                     "id": 2,
@@ -4178,17 +6088,17 @@
                   {
                     "id": 3,
                     "name": "no_stream",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 4,
                     "name": "any",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 5,
                     "name": "stream_exists",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   }
                 ]
               }
@@ -4205,7 +6115,7 @@
               {
                 "id": 2,
                 "name": "no_position",
-                "type": "event_store.client.shared.Empty"
+                "type": "event_store.client.Empty"
               }
             ],
             "messages": [
@@ -4242,7 +6152,7 @@
                   {
                     "id": 1,
                     "name": "stream_identifier",
-                    "type": "event_store.client.shared.StreamIdentifier"
+                    "type": "event_store.client.StreamIdentifier"
                   },
                   {
                     "id": 2,
@@ -4252,17 +6162,17 @@
                   {
                     "id": 3,
                     "name": "no_stream",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 4,
                     "name": "any",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   },
                   {
                     "id": 5,
                     "name": "stream_exists",
-                    "type": "event_store.client.shared.Empty"
+                    "type": "event_store.client.Empty"
                   }
                 ]
               }
@@ -4279,7 +6189,7 @@
               {
                 "id": 2,
                 "name": "no_position",
-                "type": "event_store.client.shared.Empty"
+                "type": "event_store.client.Empty"
               }
             ],
             "messages": [
@@ -4326,6 +6236,13 @@
                 "name": "Tombstone",
                 "in_type": "TombstoneReq",
                 "out_type": "TombstoneResp"
+              },
+              {
+                "name": "BatchAppend",
+                "in_type": "BatchAppendReq",
+                "out_type": "BatchAppendResp",
+                "in_streamed": true,
+                "out_streamed": true
               }
             ]
           }
@@ -4333,6 +6250,18 @@
         "imports": [
           {
             "path": "shared.proto"
+          },
+          {
+            "path": "status.proto"
+          },
+          {
+            "path": "google/protobuf/duration.proto"
+          },
+          {
+            "path": "google/protobuf/empty.proto"
+          },
+          {
+            "path": "google/protobuf/timestamp.proto"
           }
         ],
         "package": {

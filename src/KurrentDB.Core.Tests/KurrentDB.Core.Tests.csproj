@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<IsKurrentNUnit>true</IsKurrentNUnit>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.OpenApi.Readers" />
+		<PackageReference Include="System.Linq.Async">
+			<ExcludeAssets>compile</ExcludeAssets>
+		</PackageReference>
+		<!-- Workaround because there's no compiler support for the IgnoresAccessChecksTo attribute. -->
+		<!-- See: https://github.com/aelij/IgnoresAccessChecksToGenerator?tab=readme-ov-file -->
+		<PackageReference Include="IgnoresAccessChecksToGenerator" PrivateAssets="All" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\KurrentDB.Core.Testing.NUnit\KurrentDB.Core.Testing.NUnit.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="TestConfigs\*.yaml">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="Resources\es-tile.png">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="swagger.yaml">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<IgnoresAccessChecksTo Include="EventStore.ClientAPI" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Update="Configuration\test.eventstore.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+</Project>

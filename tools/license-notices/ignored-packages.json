@@ -1,0 +1,9 @@
+[
+  "EventStore.*",
+  "Kurrent.*",
+  "Microsoft.*",
+  "NETStandard.Library",
+  "runtime.*",
+  "System.*",
+  "vswhere"
+]

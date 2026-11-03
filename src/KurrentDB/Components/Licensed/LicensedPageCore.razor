@@ -1,0 +1,19 @@
+@* Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements. *@
+@* Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md). *@
+
+@inherits WithLicense
+
+<PageTitle>KurrentDB: @PageName</PageTitle>
+
+@if (HasLicense) {
+	@Body
+} else {
+	<MudText>
+		@PageName page requires a valid <MudLink Href="/ui/license">license</MudLink>.
+	</MudText>
+}
+
+@code {
+	protected abstract string PageName { get; }
+	private protected virtual RenderFragment Body => null;
+}

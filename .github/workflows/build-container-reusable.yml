@@ -1,0 +1,150 @@
+name: Build Container - Reusable
+
+on:
+  workflow_call:
+    inputs:
+      container-runtime:
+        required: true
+        type: string
+
+jobs:
+  # find all projects in the slnf that end .Tests.csproj.
+  discover-projects:
+    runs-on: ubuntu-latest
+    name: discover-projects
+    outputs:
+      modules: ${{ steps.discover.outputs.modules }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: discover
+        run: |
+          modules=$(cat KurrentDB.ContainerTests.slnf | jq -c '[.solution.projects[] | select(test("(?i)\\.tests\\.csproj$")) | gsub("\\\\"; "/")| select(startswith("src/")) | ltrimstr("src/")]')
+          echo "modules=$modules" >> $GITHUB_OUTPUT
+  build-container:
+    runs-on: ubuntu-latest
+    name: build-${{ inputs.container-runtime }}
+    steps:
+    -  
+      name: Checkout
+      uses: actions/checkout@v4
+    -  
+      name: Install net10.0
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 10.0.x
+    -  
+      name: Setup QEMU
+      uses: docker/setup-qemu-action@v2
+    -  
+      name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    -  
+      name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    -  
+      name: Setup Variables
+      id: variables
+      uses: kanga333/variable-mapper@master
+      with:
+        key: "${{ inputs.container-runtime }}"
+        map: |
+          {
+            "noble": {
+              "runtime": "linux-x64"
+            },
+            "alpine": {
+              "runtime": "linux-musl-x64"
+            }
+          }
+        export_to: output
+    -  
+      name: Build
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        load: true
+        tags: kurrentdb
+        build-args: |
+          CONTAINER_RUNTIME=${{ inputs.container-runtime }}
+          RUNTIME=${{ steps.variables.outputs.runtime }}
+    -  
+      name: Verify Build
+      run: |
+        docker run --rm kurrentdb --insecure --what-if
+    -  
+      name: Build Test Container
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        load: true
+        target: test
+        tags: kurrentdb-test
+        build-args: |
+          CONTAINER_RUNTIME=${{ inputs.container-runtime }}
+          RUNTIME=${{ steps.variables.outputs.runtime }}
+    -
+      name: Save test image as artifact
+      run: docker save kurrentdb-test -o kurrentdb-test.tar
+    -
+      uses: actions/upload-artifact@v4
+      with:
+        name: kurrentdb-test
+        path: kurrentdb-test.tar
+        retention-days: 1
+
+  run-tests:
+    needs: [discover-projects, build-container]
+    strategy:
+      fail-fast: false
+      matrix:
+        module: ${{ fromJson(needs.discover-projects.outputs.modules) }}
+    runs-on: ubuntu-latest
+    name: ${{ matrix.module }}
+    steps:
+    -
+      uses: actions/download-artifact@v4
+      with:
+        name: kurrentdb-test
+    -
+      name: Load Docker image
+      run: docker load -i kurrentdb-test.tar
+
+    # pass env vars so that GitHubActionsTestLogger can populate GitHub job summary 
+    -  
+      name: Run Tests
+      run: >
+        docker run
+        --volume $(pwd)/test-results:/build/test-results
+        --volume ${{ github.step_summary }}:/build/step-summary
+        --rm
+        --env GITHUB_STEP_SUMMARY=/build/step-summary
+        --env GITHUB_ACTIONS=true
+        --env GITHUB_SERVER_URL=${{ github.server_url }}
+        --env GITHUB_REPOSITORY=${{ github.repository }}
+        --env GITHUB_WORKSPACE=${{ github.workspace }}
+        --env GITHUB_SHA=${{ github.sha }}
+        kurrentdb-test
+        dotnet test
+        --results-directory /build/test-results
+        --configuration release
+        --project /build/src/${{ matrix.module }}
+    -
+      name: Remove slashes
+      id: remove_slashes
+      shell: bash
+      run: |
+        base="${{ matrix.module }}"
+        safe="${base//\//-}"
+        echo "value=$safe" >> $GITHUB_OUTPUT
+    -
+      name: Publish Test Results (All)
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ steps.remove_slashes.outputs.value }}
+        path: |
+          test-results/**/*.trx

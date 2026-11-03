@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+		<Nullable>enable</Nullable>
+		<IsKurrentXUnit>true</IsKurrentXUnit>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\KurrentDB.Core\KurrentDB.Core.csproj" />
+		<ProjectReference Include="..\KurrentDB.Licensing\KurrentDB.Licensing.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\KurrentDB.Common\Utils\version.properties">
+			<Link>version.properties</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+</Project>

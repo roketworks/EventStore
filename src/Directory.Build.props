@@ -3,30 +3,86 @@
 		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
 		<DebugType Condition=" '$(Configuration)' == 'Debug' ">full</DebugType>
 		<DebugType Condition=" '$(Configuration)' == 'Release' ">pdbonly</DebugType>
-		<Authors>Event Store Ltd</Authors>
+		<Authors>Kurrent, Inc</Authors>
 		<PackageIconUrl>ouro.png</PackageIconUrl>
 		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
-		<PackageProjectUrl>https://eventstore.com</PackageProjectUrl>
+		<PackageProjectUrl>https://kurrent.io</PackageProjectUrl>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-		<Copyright>Copyright 2012-2020 Event Store Ltd</Copyright>
-		<PackageReleaseNotes>https://eventstore.com/blog/</PackageReleaseNotes>
-		<LangVersion>9.0</LangVersion>
+		<Copyright>Copyright 2011-2026 Kurrent, Inc</Copyright>
+		<PackageReleaseNotes>https://docs.kurrent.io/server/latest/release-schedule/release-notes</PackageReleaseNotes>
+		<TargetFramework>net10.0</TargetFramework>
+		<LangVersion>14.0</LangVersion>
 		<IsPackable>false</IsPackable>
-		<MinVerTagPrefix>oss-v</MinVerTagPrefix>
+		<VersionPrefix>26.2.0</VersionPrefix>
+		<VersionSuffix>prerelease</VersionSuffix>
+		<!-- Adjust for SYSLIB0057 separately to .NET 10 upgrade -->
+		<!-- Adjust for XUNIT1051 separately. Lots of lines but very simple -->
+		<NoWarn>SYSLIB0057;xUnit1051</NoWarn>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+		<TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) @"$(MSBuildThisFileDirectory)../ci/ci.rsp"</TestingPlatformCommandLineArguments>
+		<!-- we put these two here and not only for explicitly labelled test projects to make sure that -->
+		<!-- we don't accidentally mix MTP with VSTest, which is not supported -->
+		<!-- tell xunit projects to use MTP -->
+		<UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+		<!-- tell nunit projects to use MTP -->
+		<EnableNUnitRunner>true</EnableNUnitRunner>
 	</PropertyGroup>
-	<Target Name="UpdateAssemblyVersion" AfterTargets="MinVer">
-  		<PropertyGroup>
-    		<AssemblyVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch).0</AssemblyVersion>
-  		</PropertyGroup>
-	</Target>
-	<ItemGroup>
-		<None Include="..\..\LICENSE.md" Pack="true" PackagePath="\"/>
-		<None Include="..\..\ouro.png" Pack="true" PackagePath="\"/>
+
+	<!-- TUnit -->
+	<ItemGroup Condition="'$(IsKurrentTUnit)' == 'True'">
+		<PackageReference Include="TUnit" />
 	</ItemGroup>
-	<ItemGroup>
-		<PackageReference Include="MinVer" Version="2.3.0">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-		</PackageReference>
+
+	<!-- XUnit -->
+	<ItemGroup Condition="'$(IsKurrentXUnit)' == 'True'">
+		<PackageReference Include="xunit.v3.mtp-v2" />
+	</ItemGroup>
+
+	<!-- NUnit -->
+	<PropertyGroup Condition="'$(IsKurrentNUnit)' == 'True'">
+		<TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --settings $(MSBuildThisFileDirectory)../ci/ci.runsettings</TestingPlatformCommandLineArguments>
+	</PropertyGroup>
+	<ItemGroup Condition="'$(IsKurrentNUnit)' == 'True'">
+		<!--
+			Microsoft.NET.Test.Sdk is not required with MTP, but Rider can't locate tests without it.
+			See https://youtrack.jetbrains.com/projects/RIDER/issues/RIDER-131530
+		-->
+		<PackageReference Include="Microsoft.NET.Test.Sdk" />
+		<PackageReference Include="NUnit" />
+		<PackageReference Include="NUnit3TestAdapter" />
+	</ItemGroup>
+
+	<!-- All test projects -->
+	<ItemGroup Condition="'$(IsKurrentTUnit)' == 'True' Or '$(IsKurrentXUnit)' == 'True' Or '$(IsKurrentNUnit)' == 'True'">
+		<PackageReference Include="Microsoft.Testing.Platform" />
+		<PackageReference Include="Microsoft.Testing.Platform.MSBuild" />
+		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+		<PackageReference Include="Microsoft.Testing.Extensions.CrashDump" />
+		<PackageReference Include="Microsoft.Testing.Extensions.HangDump" />
+		<PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(IsPlugin)' == 'true'">
+		<ProjectReference Include="$(MSBuildThisFileDirectory)\KurrentDB.Plugins\KurrentDB.Plugins.csproj" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(IsPluginsTestProject)' == 'true'">
+		<ProjectReference Include="..\KurrentDB.Plugins.TestHelpers\KurrentDB.Plugins.TestHelpers.csproj" />
+	</ItemGroup>
+
+	<ItemGroup Label="Default Packages">
+		<PackageReference Include="JetBrains.Annotations" PrivateAssets="All" />
+		<Using Include="JetBrains.Annotations" />
+	</ItemGroup>
+
+	<ItemGroup Label="NuGet Audit Suppressions">
+		<!--
+		  CVE-2025-6965 (GHSA-2m69-gcr7-jv3q): SQLitePCLRaw.lib.e_sqlite3 2.1.11 bundles SQLite < 3.50.2,
+		  pulled in transitively via Microsoft.Data.Sqlite (referenced by KurrentDB.Core for the scavenge backend).
+		  The fixed package 2.1.12 relies on glibc 2.33/2.34 which is not available on RHEL 8, which we'd like to support since it is a supported platform of .NET10
+		  The vulnerability poses no threat to KurrentDB so we can upgrade it again later when there is a compatible package.
+		-->
+		<NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
 	</ItemGroup>
 </Project>

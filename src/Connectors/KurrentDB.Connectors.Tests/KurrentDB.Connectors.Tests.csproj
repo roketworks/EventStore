@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<NoWarn>xUnit1041;xUnit1051</NoWarn>
+		<IsKurrentXUnit>true</IsKurrentXUnit>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Some packages that are configured with PrivateAssets in the plugin need to be referenced here -->
+		<PackageReference Include="Kurrent.Surge" />
+		<PackageReference Include="Eventuous.Testing" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\KurrentDB\KurrentDB.csproj" />
+		<ProjectReference Include="..\KurrentDB.Connectors\KurrentDB.Connectors.csproj" />
+		<ProjectReference Include="..\..\KurrentDB.Surge.Testing\KurrentDB.Surge.Testing.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Bogus" />
+		<Using Include="Humanizer" />
+		<Using Include="FluentAssertions" />
+		<Using Include="Microsoft.Extensions.Time.Testing" />
+		<Using Include="Xunit" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="Planes\Management\ConnectorApplication\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Remove="Planes\Management\ConnectorApplication\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="Planes\Management\ConnectorApplication\**" />
+	</ItemGroup>
+</Project>

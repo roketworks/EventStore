@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+		<TestingPlatformCommandLineArguments></TestingPlatformCommandLineArguments>
+		<OutputType>Exe</OutputType>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="BenchmarkDotNet" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\KurrentDB.Projections.Management.Tests\KurrentDB.Projections.Management.Tests.csproj" />
+		<ProjectReference Include="..\KurrentDB.Projections.JavaScript\KurrentDB.Projections.JavaScript.csproj" />
+	</ItemGroup>
+</Project>

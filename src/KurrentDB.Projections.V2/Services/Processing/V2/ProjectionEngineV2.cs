@@ -1,0 +1,380 @@
+// Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements.
+// Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md).
+
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
+using System.Security.Claims;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using DotNext.Runtime.CompilerServices;
+using KurrentDB.Core;
+using KurrentDB.Core.Data;
+using KurrentDB.Core.Services.Transport.Enumerators;
+using KurrentDB.Core.Time;
+using KurrentDB.Projections.Core.Services.Processing.Checkpointing;
+using KurrentDB.Projections.Core.Standard;
+using Serilog;
+using CoreResolvedEvent = KurrentDB.Core.Data.ResolvedEvent;
+using ProjectionResolvedEvent = KurrentDB.Projections.Core.Services.Processing.ResolvedEvent;
+
+namespace KurrentDB.Projections.Core.Services.Processing.V2;
+
+public sealed class ProjectionEngineV2 : IAsyncDisposable {
+	private static readonly ILogger Log = Serilog.Log.ForContext<ProjectionEngineV2>();
+
+	private readonly ProjectionEngineV2Config _config;
+	private readonly IReadStrategy _readStrategy;
+	private readonly ISystemClient _client;
+	private readonly ClaimsPrincipal _user;
+	private readonly CancellationTokenSource _cts = new();
+	private readonly PartitionStateCache _partitionStates;
+	private Task _runTask;
+	private long _totalEventsProcessed;
+
+	public ProjectionEngineV2(
+		ProjectionEngineV2Config config,
+		IReadStrategy readStrategy,
+		ISystemClient client,
+		ClaimsPrincipal user) {
+		_config = config ?? throw new ArgumentNullException(nameof(config));
+		_readStrategy = readStrategy ?? throw new ArgumentNullException(nameof(readStrategy));
+		_client = client ?? throw new ArgumentNullException(nameof(client));
+		_user = user ?? throw new ArgumentNullException(nameof(user));
+		_partitionStates = new PartitionStateCache(
+			_config.MaxPartitionStateCacheSize,
+			name: "shared",
+			projectionName: _config.ProjectionName);
+	}
+
+	public void Start(TFPos checkpoint) {
+		_runTask = Run(checkpoint, _cts.Token);
+	}
+
+	public async ValueTask DisposeAsync() {
+		if (_cts.IsCancellationRequested)
+			return;
+
+		await _cts.CancelAsync();
+		if (_runTask is { } runTask)
+			await runTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+
+		await _partitionStates.DisposeAsync();
+		_cts.Dispose();
+	}
+
+	public bool IsFaulted => _runTask?.IsFaulted ?? false;
+	public bool IsStopped => _runTask?.IsCompleted ?? false;
+	public bool IsStopping => _runTask is { IsCompleted: false } && _cts.IsCancellationRequested;
+	public Exception FaultException => _runTask?.Exception?.InnerException;
+	public long TotalEventsProcessed => Interlocked.Read(ref _totalEventsProcessed);
+
+	public string GetPartitionState(string partitionKey) =>
+		_partitionStates.TryGet(partitionKey, out var state) ? state : null;
+
+	/// <summary>
+	/// Returns approximate size and eviction count for the shared partition-state cache.
+	/// Per-slot caches are intentionally excluded: they double-count partition keys that
+	/// appear across multiple processor pools, so only the shared cache is the faithful summary.
+	/// <para>
+	/// <see cref="CacheMetrics.Size"/> is derived from <see cref="PartitionStateCache.Count"/>, which
+	/// the wrapper decrements inside SIEVE's asynchronous eviction callback. As a result the reported
+	/// size can temporarily exceed <see cref="ProjectionEngineV2Config.MaxPartitionStateCacheSize"/>
+	/// between a sweep and the callback firing. Treat the value as an upper-bounded observation,
+	/// not a hard invariant.
+	/// </para>
+	/// </summary>
+	public CacheMetrics GetCacheMetrics() =>
+		new(Size: _partitionStates.Count, Evictions: _partitionStates.Evictions);
+
+	/// <param name="Size">Approximate current item count in the shared cache (see remarks on <see cref="GetCacheMetrics"/>).</param>
+	/// <param name="Evictions">Monotonic count of entries evicted since the engine started.</param>
+	public readonly record struct CacheMetrics(long Size, long Evictions);
+
+	[AsyncMethodBuilder(typeof(SpawningAsyncTaskMethodBuilder))]
+	private async Task Run(TFPos checkpoint, CancellationToken ct) {
+		Log.Information("ProjectionEngineV2 {Name} starting from {Checkpoint}", _config.ProjectionName, checkpoint);
+
+		var partitionCount = _config.PartitionCount;
+
+		// todo: consider limiting partitionCount to 1 if the projection itself does not partition.
+		// BiState projections use shared state (s[1]) that every event can modify.
+		// This creates a total ordering dependency — true parallelism isn't possible.
+		if (_config.SourceDefinition.IsBiState && partitionCount > 1) {
+			Log.Warning("BiState projection {Name} forced to PartitionCount=1 (shared state requires sequential processing)",
+				_config.ProjectionName);
+			partitionCount = 1;
+		}
+
+		// Partition key is computed on the read loop thread using a dedicated handler instance.
+		// Dispatcher is single-threaded, so Jint thread safety is not a concern.
+		using var partitionKeyHandler = _config.SourceDefinition.ByCustomPartitions
+			? _config.StateHandlerFactory.Invoke()
+			: null;
+
+		var getPartitionKey = BuildPartitionKeyFunction(partitionKeyHandler);
+
+		var dispatcher = new PartitionDispatcher(partitionCount, getPartitionKey);
+
+		var coordinator = new CheckpointCoordinator(partitionCount, _config.ProjectionName, dispatcher, _client, _user);
+
+		// Each partition gets its own state handler instance (Jint is not thread-safe).
+		var partitionHandlers = new IProjectionStateHandler[partitionCount];
+		var partitionTasks = new Task[partitionCount];
+		// Let the partitions drain & checkpoint rather than cancelling them.
+		// We stop them by completing their channels via dispatcher.Complete().
+		var partitionCt = CancellationToken.None;
+		for (int i = 0; i < partitionCount; i++) {
+			partitionHandlers[i] = _config.StateHandlerFactory.Invoke();
+			var processor = new PartitionProcessor(
+				i,
+				dispatcher.GetPartitionReader(i),
+				partitionHandlers[i],
+				_config.ProjectionName,
+				_config.SourceDefinition.IsBiState,
+				_config.EmitEnabled,
+				coordinator.ReportPartitionCheckpoint,
+				// loadPersistedState uses CancellationToken.None so drain-time cache misses
+				// (more likely with bounded caches) can still complete checkpointing after
+				// the engine's cancellation token has fired.
+				loadPersistedState: partitionKey => LoadPersistedPartitionState(partitionKey, CancellationToken.None),
+				sharedPartitionStates: _partitionStates,
+				maxPartitionStateCacheSize: _config.MaxPartitionStateCacheSize);
+			partitionTasks[i] = Task.Run(() => processor.Run(partitionCt), partitionCt);
+		}
+
+		Exception partitionFault = null;
+		try {
+			// Fault the projection if a partitionTask completes unexpectedly.
+			using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+			using var drainCts = new CancellationTokenSource();
+			var readLoop = RunReadLoop(checkpoint, dispatcher, coordinator, readCts.Token, drainCts.Token);
+			var exited = await Task.WhenAny([readLoop, ..partitionTasks]);
+
+			if (exited != readLoop) {
+				// a partition task exited.
+				// it can fault due to user javascript throwing, but it should never complete successfully before readLoop
+				// and it should never be cancelled (we run them with ct.None);
+				partitionFault = exited.IsFaulted
+					? exited.Exception!.InnerException ?? exited.Exception
+					: new InvalidOperationException(
+							$"Partition processor for projection {_config.ProjectionName} completed in an unexpected status: {exited.Status}");
+
+				Log.Error(partitionFault, "ProjectionEngineV2 {Name} partition processor stopped", _config.ProjectionName);
+
+				// Cancelling both tokens is what stops the read loop: every await
+				// in it is token-governed, including the final checkpoint marker
+				// (drain token), which must not wait on a checkpoint the dead
+				// partition will never ack. Completing the channels is what lets
+				// the sibling processors exit; doing it before awaiting the read
+				// loop is deliberate redundancy - if a future await in the read
+				// loop misses a token, channel closure still unblocks the writer
+				// instead of wedging the fault path again.
+				await readCts.CancelAsync();
+				await drainCts.CancelAsync();
+				dispatcher.Complete(partitionFault);
+				await readLoop.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+				ExceptionDispatchInfo.Capture(partitionFault).Throw();
+			}
+
+			await readLoop;
+			dispatcher.Complete();
+		} catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+			dispatcher.Complete();
+			throw;
+		} catch (Exception ex) when (!ReferenceEquals(ex, partitionFault)) {
+			Log.Error(ex, "ProjectionEngineV2 {Name} read loop failed", _config.ProjectionName);
+			dispatcher.Complete(ex);
+			throw;
+		} finally {
+			// Wait for all partition processors to drain
+			try {
+				await Task.WhenAll(partitionTasks);
+			} catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+				// Expected on cancellation
+			} catch (Exception) when (partitionFault is not null) {
+				// The primary partition fault is already propagating; sibling
+				// processors failing during drain must not replace it. WhenAll only
+				// surfaces its first fault, so log distinct siblings off the tasks.
+				foreach (var task in partitionTasks) {
+					if (task.IsFaulted && !ReferenceEquals(task.Exception?.GetBaseException(), partitionFault))
+						Log.Warning(task.Exception?.InnerException, "ProjectionEngineV2 {Name} sibling partition processor failed during drain", _config.ProjectionName);
+				}
+			}
+
+			// Dispose per-partition state handlers
+			foreach (var handler in partitionHandlers) {
+				handler?.Dispose();
+			}
+			Log.Information("ProjectionEngineV2 {Name} stopped", _config.ProjectionName);
+		}
+	}
+
+	private async Task RunReadLoop(TFPos checkpoint, PartitionDispatcher dispatcher, CheckpointCoordinator coordinator, CancellationToken ct, CancellationToken drainCt) {
+		long eventsProcessed = 0;
+		long bytesProcessed = 0;
+		var lastCheckpointTime = Instant.Now;
+		var lastLogPosition = checkpoint;
+
+		// When the projection declares a specific set of event types, drop anything else here.
+		// Read-level filters cover the stream/category dimension only; without this, Jint's Handle
+		// overwrites partition state with the event body when no handler matches (matches V1's
+		// EventFilter.Passes behaviour).
+		var handledEventTypes = _config.SourceDefinition.AllEvents
+			? null
+			: new HashSet<string>(
+				_config.SourceDefinition.Events
+					?? throw new InvalidOperationException(
+						$"Projection '{_config.ProjectionName}' declares specific event types (AllEvents=false) but Events is null."),
+				StringComparer.Ordinal);
+
+		try {
+			await foreach (var response in _readStrategy.ReadFrom(checkpoint, ct)) {
+				switch (response) {
+					case ReadResponse.EventReceived eventReceived:
+						var coreEvent = eventReceived.Event;
+						var logPosition = coreEvent.OriginalPosition
+							?? throw new InvalidOperationException("OriginalPosition was not present. Likely a stream read with explicit transaction");
+
+						// System events (event types starting with '$') are normally skipped,
+						// but tombstone markers need to be routed so projections can handle $deleted.
+						var dispatched = false;
+						if (coreEvent.Event is null) {
+							// A resolved event with no underlying record: a link whose target event
+							// has been scavenged or deleted.
+						} else if (coreEvent.Event.EventType.StartsWith('$')) {
+							var projEvent = ConvertToProjectionEvent(coreEvent);
+							// note: HandlesDeletedNotifications is only true when partitioning by stream
+							if (_config.SourceDefinition.HandlesDeletedNotifications && StreamDeletedHelper.IsStreamDeletedEvent(
+								    projEvent.EventStreamId, projEvent.EventType, projEvent.Data,
+								    out var deletedPartitionStreamId)) {
+								await dispatcher.DispatchPartitionDeleted(deletedPartitionStreamId, logPosition, ct);
+								dispatched = true;
+							} else {
+								break;
+							}
+						} else if (handledEventTypes is null || handledEventTypes.Contains(coreEvent.Event.EventType)) {
+							var projEvent = ConvertToProjectionEvent(coreEvent);
+							await dispatcher.DispatchEvent(projEvent, logPosition, ct);
+							dispatched = true;
+						}
+						// else: event type isn't declared; skip dispatch but still advance
+						// the read position and accrue unhandled bytes below so long tails
+						// of filtered events can't stall checkpoint progress.
+
+						if (dispatched) {
+							eventsProcessed++;
+							Interlocked.Increment(ref _totalEventsProcessed);
+						}
+
+						var recordForCheckpoint = coreEvent.Event ?? coreEvent.Link;
+						bytesProcessed += recordForCheckpoint.Data.Length + recordForCheckpoint.Metadata.Length;
+						lastLogPosition = logPosition;
+
+						// Check if checkpoint is due
+						var elapsedMs = Instant.Now.ElapsedTimeSince(lastCheckpointTime).TotalMilliseconds;
+						if (elapsedMs >= _config.CheckpointAfterMs &&
+						    (eventsProcessed >= _config.CheckpointHandledThreshold ||
+						     bytesProcessed >= _config.CheckpointUnhandledBytesThreshold)) {
+							await coordinator.InjectCheckpointMarker(lastLogPosition, ct);
+							eventsProcessed = 0;
+							bytesProcessed = 0;
+							lastCheckpointTime = Instant.Now;
+						}
+
+						break;
+
+					// Ignore subscription infrastructure messages
+					case ReadResponse.CheckpointReceived checkpointReceived:
+						lastLogPosition = new TFPos(
+							commitPosition: (long)checkpointReceived.CommitPosition,
+							preparePosition: (long)checkpointReceived.PreparePosition);
+						// todo: consider checkpointing here
+						break;
+					case ReadResponse.SubscriptionConfirmed:
+					case ReadResponse.SubscriptionCaughtUp:
+					case ReadResponse.SubscriptionFellBehind:
+						break;
+				}
+			}
+		} catch (OperationCanceledException) when (ct.IsCancellationRequested) {
+			// Cancellation is expected during shutdown — fall through to final checkpoint
+		}
+
+		// Inject a final checkpoint marker if the read position has advanced
+		// since the last checkpoint — covers both handled events and tails of
+		// filtered events that still moved the log position forward. The drain
+		// token (not ct) governs it: on graceful shutdown ct is already cancelled
+		// but the final checkpoint must still be written, while the partition-fault
+		// path cancels the drain so this cannot wait on a checkpoint the dead
+		// partition will never ack.
+		if (eventsProcessed > 0 || bytesProcessed > 0) {
+			await coordinator.InjectCheckpointMarker(lastLogPosition, drainCt);
+		}
+	}
+
+#nullable enable
+	/// <summary>
+	/// Builds the partition key function for the dispatcher.
+	/// For ByCustomPartitions, uses a dedicated handler instance (called single-threaded
+	/// on the read loop). For ByStreams, uses stream ID. Otherwise returns empty string.
+	/// </summary>
+	private Func<ProjectionResolvedEvent, string?> BuildPartitionKeyFunction(IProjectionStateHandler? partitionKeyHandler) {
+		if (_config.SourceDefinition.ByCustomPartitions) {
+			return projEvent => {
+				var checkpointTag = CheckpointTag.FromPosition(0, projEvent.Position.CommitPosition, projEvent.Position.PreparePosition);
+				return partitionKeyHandler!.GetStatePartition(checkpointTag, null, projEvent);
+			};
+		}
+
+		if (_config.SourceDefinition.ByStreams) {
+			return projEvent => projEvent.EventStreamId;
+		}
+
+		return _ => "";
+	}
+
+	/// <summary>
+	/// Loads persisted partition state from the state stream after a restart.
+	/// Returns the state JSON if found, null otherwise.
+	/// </summary>
+	private async ValueTask<string?> LoadPersistedPartitionState(string partitionKey, CancellationToken ct) {
+		var stateStreamId = ProjectionNamesBuilder.MakeStateStreamName(_config.ProjectionName, partitionKey);
+		try {
+			var lastEvent = await _client.Reading.ReadStreamLastEvent(stateStreamId, ct);
+			if (lastEvent is null)
+				return null;
+
+			return Encoding.UTF8.GetString(lastEvent.Value.Event.Data.Span);
+		} catch (ReadResponseException.StreamNotFound) {
+			return null;
+		}
+	}
+#nullable restore
+
+	/// <summary>
+	/// Converts a Core ResolvedEvent (struct from storage engine) to a Projections
+	/// ResolvedEvent (class used by projection state handlers and partition dispatcher).
+	/// This is necessary because the V2 namespace shadows Core.Data.ResolvedEvent
+	/// with Processing.ResolvedEvent.
+	/// </summary>
+	internal static ProjectionResolvedEvent ConvertToProjectionEvent(CoreResolvedEvent coreEvent) {
+		var e = coreEvent.Event;
+		var link = coreEvent.Link;
+		return new(
+			positionStreamId: link?.EventStreamId ?? e.EventStreamId,
+			positionSequenceNumber: link?.EventNumber ?? e.EventNumber,
+			eventStreamId: e.EventStreamId,
+			eventSequenceNumber: e.EventNumber,
+			resolvedLinkTo: link is not null,
+			position: coreEvent.OriginalPosition
+				?? throw new InvalidOperationException("OriginalPosition was not present. Likely a stream read with explicit transaction"),
+			eventId: e.EventId,
+			eventType: e.EventType,
+			isJson: e.IsJson,
+			data: e.Data.Length > 0 ? Encoding.UTF8.GetString(e.Data.Span) : null,
+			metadata: e.Metadata.Length > 0 ? Encoding.UTF8.GetString(e.Metadata.Span) : null);
+	}
+}

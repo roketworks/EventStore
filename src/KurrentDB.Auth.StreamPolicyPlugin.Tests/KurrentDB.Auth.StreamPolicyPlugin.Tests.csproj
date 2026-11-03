@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+<PropertyGroup>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<IsKurrentXUnit>true</IsKurrentXUnit>
+	<Nullable>enable</Nullable>
+</PropertyGroup>
+
+<ItemGroup>
+	<ProjectReference Include="..\KurrentDB.Core.Testing\KurrentDB.Core.Testing.csproj" />
+	<ProjectReference Include="..\KurrentDB.Auth.StreamPolicyPlugin\KurrentDB.Auth.StreamPolicyPlugin.csproj" />
+</ItemGroup>
+
+</Project>

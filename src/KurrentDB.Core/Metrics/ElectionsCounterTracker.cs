@@ -1,0 +1,36 @@
+// Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements.
+// Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md).
+
+using KurrentDB.Core.Bus;
+using KurrentDB.Core.Messages;
+
+namespace KurrentDB.Core.Metrics;
+
+public interface IElectionCounterTracker :
+	IHandle<ElectionMessage.ElectionsDone>,
+	IHandle<ElectionMessage.LeaderAppointed> {
+}
+
+public class ElectionsCounterTracker : IElectionCounterTracker {
+	private readonly CounterSubMetric _electionsCounter;
+
+	public ElectionsCounterTracker(CounterSubMetric electionsCounter) {
+		_electionsCounter = electionsCounter;
+	}
+
+	public void Handle(ElectionMessage.ElectionsDone message) {
+		_electionsCounter.Add(1);
+	}
+
+	public void Handle(ElectionMessage.LeaderAppointed message) {
+		_electionsCounter.Add(1);
+	}
+
+	public class NoOp : IElectionCounterTracker {
+		public void Handle(ElectionMessage.ElectionsDone message) {
+		}
+
+		public void Handle(ElectionMessage.LeaderAppointed message) {
+		}
+	}
+}

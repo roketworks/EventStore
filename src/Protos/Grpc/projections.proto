@@ -15,7 +15,7 @@ service Projections {
 	rpc Reset (ResetReq) returns (ResetResp);
 	rpc State (StateReq) returns (StateResp);
 	rpc Result (ResultReq) returns (ResultResp);
-	rpc RestartSubsystem (event_store.client.shared.Empty) returns (event_store.client.shared.Empty);
+	rpc RestartSubsystem (event_store.client.Empty) returns (event_store.client.Empty);
 }
 
 message CreateReq {
@@ -23,18 +23,21 @@ message CreateReq {
 
 	message Options {
 		oneof mode {
-			event_store.client.shared.Empty one_time = 1;
+			event_store.client.Empty one_time = 1;
 			Transient transient = 2;
 			Continuous continuous = 3;
 		}
 		string query = 4;
+		int32 engine_version = 5; // 0 or 1 = v1 (default), 2 = v2
+		map<string, google.protobuf.Value> properties = 6;
 
 		message Transient {
 			string name = 1;
 		}
 		message Continuous {
 			string name = 1;
-			bool track_emitted_streams = 2;
+			bool emit_enabled = 2;
+			bool track_emitted_streams = 3;
 		}
 	}
 }
@@ -50,8 +53,9 @@ message UpdateReq {
 		string query = 2;
 		oneof emit_option {
 			bool emit_enabled = 3;
-			event_store.client.shared.Empty no_emit_options = 4;
+			event_store.client.Empty no_emit_options = 4;
 		}
+		map<string, google.protobuf.Value> properties = 5;
 	}
 }
 
@@ -77,10 +81,10 @@ message StatisticsReq {
 	message Options {
 		oneof mode {
 			string name = 1;
-			event_store.client.shared.Empty all = 2;
-			event_store.client.shared.Empty transient = 3;
-			event_store.client.shared.Empty continuous = 4;
-			event_store.client.shared.Empty one_time = 5;
+			event_store.client.Empty all = 2;
+			event_store.client.Empty transient = 3;
+			event_store.client.Empty continuous = 4;
+			event_store.client.Empty one_time = 5;
 		}
 	}
 }

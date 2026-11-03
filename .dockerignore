@@ -3,11 +3,10 @@ Dockerfile
 testresults/
 **/bin/
 **/obj/
-**/global.json
 **/Dockerfile*
 **/.dockerignore*
 **/*.user
 **/.idea/
-.vs/
+**/*.vs/
 .vscode/
 certs/

@@ -1,0 +1,57 @@
+@using KurrentDB.SecondaryIndexing.Stats
+@using Serilog
+@inject UiStatsService Stats
+
+@if (_state is LoadState.ReadyToLoad) {
+	<MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadStats">Load</MudButton>
+} else if (_state is LoadState.Loading) {
+	<MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large"/>
+} else if (_state is LoadState.FailedToLoad) {
+	<MudAlert Severity="Severity.Warning" Class="my-4">
+		Error: @(_exception?.Message)
+	</MudAlert>
+} else if (_details.Count > 0) {
+	<MudAlert Severity="Severity.Warning">
+		Database has explicit transactions. This functionality is deprecated and not supported by the current client protocol.
+		@if (_isRecent) {
+			<p class="mt-4">You seem to be using this feature still, consider changing your system to avoid using explicit transactions.</p>
+		}
+	</MudAlert>
+	<MudDataGrid Items="@_details">
+		<Columns>
+			<PropertyColumn Property="x => x.Category" Title="Category"/>
+			<PropertyColumn Property="x => x.TransactionCount" Title="Number of transactions"/>
+			<PropertyColumn Property="x => x.LastTransactionDate" Title="Last transaction date"/>
+		</Columns>
+	</MudDataGrid>
+} else {
+	<MudAlert Severity="Severity.Success">No explicit transactions found</MudAlert>
+}
+
+@code {
+	private LoadState _state = LoadState.ReadyToLoad;
+	private bool _isRecent;
+	private IReadOnlyList<StatsSql.GetExplicitTransactions.Result> _details = [];
+	private Exception _exception;
+
+	static readonly ILogger Log = Serilog.Log.ForContext<ExplicitTransactions>();
+
+	[CascadingParameter] Task<AuthenticationState> AuthenticationState { get; set; }
+
+	async Task LoadStats() {
+		Log.Information("User requested explicit transactions stats load via UI");
+		_state = LoadState.Loading;
+		try {
+			var principal = (await AuthenticationState).User;
+			_details = await Stats.GetExplicitTransactionsAsync(principal);
+			var latestTransactionDate = _details.Count > 0 ? _details.Max(x => x.LastTransactionDate) : DateTime.MinValue;
+			_isRecent = latestTransactionDate > DateTime.Today - TimeSpan.FromDays(30);
+			_state = LoadState.Loaded;
+		} catch (Exception ex) {
+			Log.Error(ex, "Error while loading explicit transactions stats via UI");
+			_exception = ex;
+			_state = LoadState.FailedToLoad;
+		}
+		StateHasChanged();
+	}
+}

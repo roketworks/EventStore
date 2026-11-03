@@ -1,0 +1,92 @@
+name: Common
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "samples/**"
+      - "**.md"
+  push:
+    branches:
+      - master
+      - release/*
+    tags:
+      - oss-v*
+      - v*
+    paths-ignore:
+      - "docs/**"
+      - "samples/**"
+      - "**.md"
+
+jobs:
+  vulnerability-scan:
+    runs-on: ubuntu-latest
+    name: ci/github/scan-vulnerabilities
+    steps:
+    -  
+      name: Checkout
+      uses: actions/checkout@v4
+    -  
+      name: Install net10.0
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 10.0.x
+    -  
+      name: Scan for Vulnerabilities
+      run: |
+        dotnet restore
+        dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerabilities.txt
+        # Advisories consciously accepted while awaiting an upstream fix.
+        # Keep in sync with the NuGetAuditSuppress entries in src/Directory.Build.props.
+        # GHSA-2m69-gcr7-jv3q: CVE-2025-6965, SQLitePCLRaw e_sqlite3 2.1.11 (transitive via
+        # Microsoft.Data.Sqlite); no patched bundle yet, awaiting SQLite >= 3.50.2.
+        ALLOWED_ADVISORIES='GHSA-2m69-gcr7-jv3q'
+        # Each vulnerable finding prints an advisory URL line. Fail only if a finding remains
+        # after dropping the allowlisted advisories.
+        if grep -E 'https://github\.com/advisories/' vulnerabilities.txt | grep -vF "$ALLOWED_ADVISORIES" | grep -q .; then
+          echo "::error::Unsuppressed vulnerable packages found:"
+          grep -E 'https://github\.com/advisories/' vulnerabilities.txt | grep -vF "$ALLOWED_ADVISORIES"
+          exit 1
+        fi
+        echo "No unsuppressed vulnerable packages."
+  protolock:
+    runs-on: ubuntu-latest
+    name: ci/github/protolock
+    steps:
+    -  
+      name: Checkout
+      uses: actions/checkout@v4
+    -  
+      name: Protolock Status
+      run: |
+        ./protolock.sh status --uptodate
+  docker-compose:
+    runs-on: ubuntu-latest
+    name: ci/github/docker-compose
+    steps:
+    -  
+      name: Checkout
+      uses: actions/checkout@v4
+    -  
+      name: Github Registry Docker Login
+      uses: azure/docker-login@v1
+      with:
+        login-server: docker.pkg.github.com/eventstore
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    -  
+      name: Docker Compose Smoke Test
+      env:
+        KURRENTDB__LICENSING__LICENSE_KEY: ${{ secrets.KURRENTDB_TEST_LICENSE_KEY }}
+      run: |
+        RUNTIME=linux-amd64 docker compose build
+        docker compose up --detach
+        printf 'Waiting for cluster'
+        timeout 60 bash -c -- 'until $(curl --output /dev/null --silent --insecure --fail https://localhost:2113/health/live); do printf '.'; sleep 2; done'
+        docker compose down
+    -
+      name: Docker Compose Logs
+      if: failure()
+      run: |
+        docker compose ps --all
+        docker compose logs --no-color --timestamps

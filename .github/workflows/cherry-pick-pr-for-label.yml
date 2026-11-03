@@ -7,8 +7,8 @@ jobs:
     name: Cherry pick PR commits for label
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Cherry Pick PR for label
-        uses: EventStore/Automations/cherry-pick-pr-for-label@master
+        uses: kurrent-io/Automations/cherry-pick-pr-for-label@master
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

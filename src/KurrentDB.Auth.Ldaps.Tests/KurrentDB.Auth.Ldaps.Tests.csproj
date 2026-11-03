@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+      <IsPackable>false</IsPackable>
+      <IsPublishable>false</IsPublishable>
+	  <IsPluginsTestProject>true</IsPluginsTestProject>
+      <Configurations>Release;Debug</Configurations>
+      <IsKurrentXUnit>true</IsKurrentXUnit>
+    </PropertyGroup>
+
+
+    <ItemGroup>
+      <PackageReference Include="Ductus.FluentDocker.XUnit" />
+      <PackageReference Include="EventStore.Client.Grpc.Streams" />
+			<PackageReference Include="Microsoft.AspNetCore.TestHost" />
+			<!-- https://github.com/advisories/GHSA-6c8g-7p36-r338 -->
+			<PackageReference Include="SharpCompress" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\KurrentDB.Auth.Ldaps\KurrentDB.Auth.Ldaps.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="conf\ldaps.conf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+</Project>

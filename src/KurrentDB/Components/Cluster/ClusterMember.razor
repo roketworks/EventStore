@@ -1,0 +1,98 @@
+@* Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements. *@
+@* Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md). *@
+
+@using KurrentDB.Core.Cluster
+@using KurrentDB.Core.Data
+@inject NavigationManager Navigation
+
+<MudCard Class="ma-2">
+	<MudCardHeader>
+		<CardHeaderAvatar>
+			<MudAvatar Color="@MemberIconColor">
+				<MudIcon Icon="@MemberIcon" aria-label="@(Member.IsAlive ? "Alive" : "Dead")"/>
+			</MudAvatar>
+		</CardHeaderAvatar>
+		<CardHeaderContent>
+			<MudText Typo="Typo.h6">@Member.State.ToString()</MudText>
+		</CardHeaderContent>
+		<CardHeaderActions>
+			@if (IsLocal) {
+				<MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">This node</MudChip>
+			} else if (Member.IsAlive) {
+				<MudTooltip Text="Open this node's UI">
+					<MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+					               Href="@NodeUiUrl" Target="_blank"
+					               aria-label="Open this node's UI"/>
+				</MudTooltip>
+			}
+		</CardHeaderActions>
+	</MudCardHeader>
+	<MudCardContent>
+		<MudSimpleTable Dense="true" Elevation="0" Style="background: transparent;">
+			<tbody>
+				<tr>
+					<td class="pl-0">Address</td>
+					<td style="text-align:right; font-family: monospace;">@Member.HttpEndPointIp:@Member.HttpEndPointPort</td>
+				</tr>
+				<tr>
+					<td class="pl-0">Version</td>
+					<td style="text-align:right; font-family: monospace;">@Member.ESVersion</td>
+				</tr>
+				<tr>
+					<td class="pl-0">Timestamp</td>
+					<td style="text-align:right; font-family: monospace;">@Member.TimeStamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
+				</tr>
+				<tr>
+					<td class="pl-0">Last commit</td>
+					<td style="text-align:right; font-family: monospace;">@Member.LastCommitPosition.ToString("N0")</td>
+				</tr>
+				<tr>
+					<td class="pl-0">Writer checkpoint</td>
+					<td style="text-align:right; font-family: monospace;">@Member.WriterCheckpoint.ToString("N0")</td>
+				</tr>
+				<tr>
+					<td class="pl-0">Chaser checkpoint</td>
+					<td style="text-align:right; font-family: monospace;">@Member.ChaserCheckpoint.ToString("N0")</td>
+				</tr>
+				<tr>
+					<td class="pl-0">Epoch number</td>
+					<td style="text-align:right; font-family: monospace;">@Member.EpochNumber.ToString("N0")</td>
+				</tr>
+				<tr>
+					<td class="pl-0">Epoch position</td>
+					<td style="text-align:right; font-family: monospace;">@Member.EpochPosition.ToString("N0")</td>
+				</tr>
+			</tbody>
+		</MudSimpleTable>
+	</MudCardContent>
+</MudCard>
+
+@code {
+	[Parameter] public ClientClusterInfo.ClientMemberInfo Member { get; set; }
+
+	[Parameter] public bool IsLocal { get; set; }
+
+	string NodeUiUrl => $"{new Uri(Navigation.BaseUri).Scheme}://{Member.HttpEndPointIp}:{Member.HttpEndPointPort}/";
+
+	Color MemberIconColor => Member.IsAlive ? Color.Primary : Color.Error;
+
+	string MemberIcon => Member.State switch {
+		VNodeState.Initializing => Icons.Material.Filled.Info,
+		VNodeState.DiscoverLeader => Icons.Material.Filled.Info,
+		VNodeState.Unknown => Icons.Material.Filled.Error,
+		VNodeState.PreReplica => Icons.Material.Filled.CompareArrows,
+		VNodeState.CatchingUp => Icons.Material.Filled.Info,
+		VNodeState.Clone => Icons.Material.Filled.Error,
+		VNodeState.Follower => Icons.Material.Filled.FileDownload,
+		VNodeState.PreLeader => Icons.Material.Filled.Warning,
+		VNodeState.Leader => Icons.Material.Filled.FileUpload,
+		VNodeState.Manager => Icons.Material.Filled.Error,
+		VNodeState.ShuttingDown => Icons.Material.Filled.Warning,
+		VNodeState.Shutdown => Icons.Material.Filled.Warning,
+		VNodeState.ReadOnlyLeaderless => Icons.Material.Filled.Warning,
+		VNodeState.PreReadOnlyReplica => Icons.Material.Filled.Info,
+		VNodeState.ReadOnlyReplica => Icons.Material.Filled.FileCopy,
+		VNodeState.ResigningLeader => Icons.Material.Filled.Warning,
+		_ => throw new ArgumentOutOfRangeException()
+	};
+}

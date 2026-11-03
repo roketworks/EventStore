@@ -1,88 +1,107 @@
-ARG CONTAINER_RUNTIME=focal
-FROM mcr.microsoft.com/dotnet/sdk:5.0-focal AS build
+# for CI
+# "build" image
+ARG CONTAINER_RUNTIME=noble
+# NOT A BUG: we can't build on alpine so we use noble as a base image
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 ARG RUNTIME=linux-x64
 
-WORKDIR /build/ci
+WORKDIR /build
+COPY ./LICENSE.md .
+COPY ./LICENSE_CONTRIBUTIONS.md .
+COPY ./NOTICE.md .
+COPY ./global.json .
+COPY ./KurrentDB.slnx .
 
+WORKDIR /build/ci
 COPY ./ci ./
 
+WORKDIR /build/proto
+COPY ./proto ./
+
 WORKDIR /build/src
-
-COPY ./src/EventStore.sln ./src/*/*.csproj ./src/Directory.Build.* ./
-
-RUN for file in $(ls *.csproj); do mkdir -p ./${file%.*}/ && mv $file ./${file%.*}/; done
-
-RUN dotnet restore --runtime=${RUNTIME}
-
+COPY ./src/Connectors/*/*.csproj ./Connectors/
+COPY ./src/SchemaRegistry/*/*.csproj ./SchemaRegistry/
+COPY ./src/*/*.csproj ./src/Directory.Build.* ./src/Directory.Packages.props ./
+RUN for file in $(ls Connectors/*.csproj); do mkdir -p ./${file%.*}/ && mv $file ./${file%.*}/; done && \
+    for file in $(ls SchemaRegistry/*.csproj); do mkdir -p ./${file%.*}/ && mv $file ./${file%.*}/; done && \
+    for file in $(ls *.csproj); do mkdir -p ./${file%.*}/ && mv $file ./${file%.*}/; done
+RUN dotnet restore /build/KurrentDB.slnx
 COPY ./src .
 
 WORKDIR /build/.git
+COPY ./.git/ .
 
-COPY ./.git .
+# "test" image
+FROM mcr.microsoft.com/dotnet/sdk:10.0-${CONTAINER_RUNTIME} AS test
+ARG CONTAINER_RUNTIME=noble
+WORKDIR /build
+COPY --from=build ./build/src ./src
+COPY --from=build ./build/ci ./ci
+COPY --from=build ./build/proto ./proto
+COPY --from=build ./build/LICENSE.md ./LICENSE.md
+COPY --from=build ./build/NOTICE.md ./NOTICE.md
+COPY --from=build ./build/LICENSE_CONTRIBUTIONS.md ./LICENSE_CONTRIBUTIONS.md
+COPY --from=build ./build/global.json ./global.json
+COPY --from=build ./build/KurrentDB.slnx ./KurrentDB.slnx
+COPY --from=build ./build/src/KurrentDB.Core.Testing/Services/Transport/Tcp/test_certificates/ca/ca.crt /usr/local/share/ca-certificates/ca_kurrentdb_test.crt
+RUN mkdir ./test-results
 
-WORKDIR /build/src
+SHELL ["/bin/bash", "-c"]
 
-RUN dotnet build --configuration=Release --no-restore
-
-FROM build as test
-ARG RUNTIME=linux-x64
-RUN echo '#!/usr/bin/env sh\n\
-cp /build/src/EventStore.Core.Tests/Services/Transport/Tcp/test_certificates/ca/ca.crt /usr/local/share/ca-certificates/ca_eventstore_test.crt\n\
-update-ca-certificates\n\
-find /build/src -maxdepth 1 -type d -name "*.Tests" -print0 | xargs -I{} -0 -n1 bash -c '"'"'dotnet test --configuration Release --blame --settings /build/ci/ci.runsettings --logger:html --logger:trx --logger:"console;verbosity=normal" --results-directory=/build/test-results/$1 $1'"'"' - '"'"'{}'"'"'\n\
-echo $(find /build/test-results -name "*.html" | xargs cat) > /build/test-results/test-results.html' \
-    >> /build/test.sh && \
-    chmod +x /build/test.sh
-CMD ["/build/test.sh"]
-
-FROM build as publish
+# "publish" image
+FROM build AS publish
 ARG RUNTIME=linux-x64
 
 RUN dotnet publish --configuration=Release --runtime=${RUNTIME} --self-contained \
-     --framework=net5.0 --output /publish EventStore.ClusterNode
+     --framework=net10.0 --output /publish /build/src/KurrentDB
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:5.0-${CONTAINER_RUNTIME} AS runtime
-ARG UID=1000
-ARG GID=1000
+# "runtime" image
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-${CONTAINER_RUNTIME} AS runtime
+ARG RUNTIME=linux-x64
+ARG UID=1001
+ARG GID=1001
 
-RUN apt update && \
-    apt install -y \
-    curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN if [[ "${RUNTIME}" = "linux-musl-x64" ]];\
+    then \
+        apk update && \
+        apk add --no-cache \
+        curl; \
+    else \
+        apt update && \
+        apt install -y \
+        adduser \
+        curl && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
 
-WORKDIR /opt/eventstore
+WORKDIR /opt/kurrentdb
 
-RUN addgroup --gid ${GID} "eventstore" && \
+RUN addgroup --gid ${GID} "kurrent" && \
     adduser \
     --disabled-password \
     --gecos "" \
-    --ingroup "eventstore" \
+    --ingroup "kurrent" \
     --no-create-home \
     --uid ${UID} \
-    "eventstore"
+    "kurrent"
 
-COPY --from=publish /publish ./
+COPY --chown=kurrent:kurrent --from=publish /publish ./
 
+RUN mkdir -p /var/lib/kurrentdb && \
+    mkdir -p /var/log/kurrentdb && \
+    mkdir -p /etc/kurrentdb && \
+    chown -R kurrent:kurrent /var/lib/kurrentdb /var/log/kurrentdb /etc/kurrentdb
 
-RUN mkdir -p /var/lib/eventstore && \
-    mkdir -p /var/log/eventstore && \
-    mkdir -p /etc/eventstore && \
-    chown -R eventstore:eventstore /opt/eventstore /var/lib/eventstore /var/log/eventstore /etc/eventstore
+USER kurrent
 
-USER eventstore
+RUN printf "NodeIp: 0.0.0.0\n\
+ReplicationIp: 0.0.0.0" >> /etc/kurrentdb/kurrentdb.conf
 
-RUN echo "ExtIp: 0.0.0.0\n\
-IntIp: 0.0.0.0" >> /etc/eventstore/eventstore.conf
+VOLUME /var/lib/kurrentdb /var/log/kurrentdb
 
-VOLUME /var/lib/eventstore
-VOLUME /var/log/eventstore
-
-EXPOSE 1112/tcp
-EXPOSE 1113/tcp
-EXPOSE 2112/tcp
-EXPOSE 2113/tcp
+EXPOSE 1112/tcp 1113/tcp 2113/tcp
 
 HEALTHCHECK --interval=5s --timeout=5s --retries=24 \
     CMD curl --fail --insecure https://localhost:2113/health/live || curl --fail http://localhost:2113/health/live || exit 1
 
-ENTRYPOINT ["/opt/eventstore/EventStore.ClusterNode"]
+ENTRYPOINT ["/opt/kurrentdb/KurrentDB"]

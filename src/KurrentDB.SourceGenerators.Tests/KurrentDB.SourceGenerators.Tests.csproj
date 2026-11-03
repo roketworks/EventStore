@@ -1,0 +1,87 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+		<IsKurrentXUnit>true</IsKurrentXUnit>
+	</PropertyGroup>
+	<ItemGroup>
+		<Compile Remove="Messaging\Cases\AbstractWithGroup.NOTCOMPILED.g.cs" />
+		<Compile Remove="Messaging\Cases\ConcreteWithoutGroup.NOTCOMPILED.g.cs" />
+		<Compile Remove="Messaging\Cases\Impartial.NOTCOMPILED.g.cs" />
+		<Compile Remove="Messaging\Cases\ImpartialNested.NOTCOMPILED.g.cs" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="Messaging\Cases\AbstractWithGroup.NOTCOMPILED.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Messaging\Cases\ConcreteWithoutGroup.NOTCOMPILED.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Messaging\Cases\Impartial.NOTCOMPILED.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Messaging\Cases\ImpartialNested.NOTCOMPILED.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+		<PackageReference Include="Newtonsoft.Json" />
+		<PackageReference Include="NuGet.Protocol" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\KurrentDB.SourceGenerators\KurrentDB.SourceGenerators.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Update="Messaging\Cases\AbstractWithGroup.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\FileScopedNamespace.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\ConcreteWithoutGroup.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\ImpartialNested.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Nested.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\NestedDerived.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Impartial.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Simple.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Abstract.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Abstract.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\FileScopedNamespace.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Message.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Message.g.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Nested.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\NestedDerived.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+		<Compile Update="Messaging\Cases\Simple.cs">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Compile>
+	</ItemGroup>
+</Project>

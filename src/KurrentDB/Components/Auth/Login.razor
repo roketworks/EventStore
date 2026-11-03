@@ -1,0 +1,86 @@
+@* Copyright (c) Kurrent, Inc and/or licensed to Kurrent, Inc under one or more agreements. *@
+@* Kurrent, Inc licenses this file to you under the Kurrent License v1 (see LICENSE.md). *@
+
+@page "/ui/login"
+@layout KurrentDB.Components.Layout.EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using EventStore.Plugins.Authentication
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Http.HttpResults
+@using MudBlazor.StaticInput
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Log in</PageTitle>
+<MudSnackbarProvider/>
+
+<div class="login-page">
+	<MudPaper Class="login-card" Elevation="6">
+		<div class="login-logo">
+			<img src="logo_white.svg" alt="Kurrent" height="40"/>
+		</div>
+		<EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+			<DataAnnotationsValidator/>
+			<div class="login-field">
+				<MudStaticTextField For="@(() => Input.Username)" @bind-Value="Input.Username"
+				                    Placeholder="Username" Variant="Variant.Outlined" Margin="Margin.Dense"
+				                    UserAttributes="@(new() { { "autocomplete", "username" }, { "aria-required", "true" } })"/>
+			</div>
+			<div class="login-field">
+				<MudStaticTextField For="@(() => Input.Password)" @bind-Value="Input.Password"
+				                    InputType="InputType.Password" Placeholder="Password" Variant="Variant.Outlined" Margin="Margin.Dense"
+				                    UserAttributes="@(new() { { "autocomplete", "current-password" }, { "aria-required", "true" } })"/>
+			</div>
+			<MudStaticButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+			                 FormAction="FormAction.Submit" Class="login-button">
+				Sign In
+			</MudStaticButton>
+		</EditForm>
+	</MudPaper>
+</div>
+
+@code {
+	[Inject] NavigationManager NavigationManager { get; set; }
+	[Inject] IAuthenticationProvider AuthProvider { get; set; }
+	[Inject] ISnackbar Snackbar { get; set; }
+	[SupplyParameterFromForm] LoginInputModel Input { get; set; }
+	[SupplyParameterFromQuery] string ReturnUrl { get; set; }
+	[CascadingParameter] HttpContext HttpContext { get; set; } = default!;
+
+	protected override void OnInitialized() {
+		Input ??= new();
+	}
+
+	public async Task LoginUser() {
+		var (status, principal) = await LoginUser(Input.Username, Input.Password);
+		if (status != HttpAuthenticationRequestStatus.Authenticated) {
+			Snackbar.Add("Invalid username or password", Severity.Error);
+			return;
+		}
+
+		await HttpContext.SignInAsync(principal);
+
+		Redirect();
+	}
+
+	async Task<(HttpAuthenticationRequestStatus, ClaimsPrincipal)> LoginUser(string username, string password) {
+		var request = new HttpAuthenticationRequest(HttpContext, username, password);
+		AuthProvider.Authenticate(request);
+		return await request.AuthenticateAsync();
+	}
+
+	void Redirect() {
+		// Only follow a local (same-site) ReturnUrl to avoid an open redirect via ?returnUrl=https://evil.example.
+		// RedirectHttpResult.IsLocalUrl is the framework's canonical check (rejects absolute and "//"/"/\" URLs).
+		NavigationManager.NavigateTo(RedirectHttpResult.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/ui/cluster");
+	}
+
+	private sealed class LoginInputModel {
+		[Required] public string Username { get; set; } = "";
+
+		[Required]
+		[DataType(DataType.Password)]
+		public string Password { get; set; } = "";
+	}
+}

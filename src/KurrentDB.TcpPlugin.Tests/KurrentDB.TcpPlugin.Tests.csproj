@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+		<Nullable>enable</Nullable>
+		<IsKurrentXUnit>true</IsKurrentXUnit>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="EventStore.Client" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\KurrentDB.Core.Testing\KurrentDB.Core.Testing.csproj" />
+	  <ProjectReference Include="..\KurrentDB.TcpPlugin\KurrentDB.TcpPlugin.csproj" />
+	</ItemGroup>
+</Project>

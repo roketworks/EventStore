@@ -1,0 +1,27 @@
+name: Build Ubuntu 22.04 (Jammy)
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "samples/**"
+      - "**.md"
+  push:
+    branches:
+      - master
+      - release/*
+    tags:
+      - oss-v*
+      - v*
+    paths-ignore:
+      - "docs/**"
+      - "samples/**"
+      - "**.md"
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-reusable.yml
+    with:
+      os: ubuntu-22.04
+      cs_symbols: "RUN_AZ_TESTS"
+    secrets: inherit
